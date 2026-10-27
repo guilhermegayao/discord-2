@@ -41,16 +41,28 @@ cp .env.example .env
 
 No PowerShell, use `Copy-Item .env.example .env`.
 
+Troque o `JWT_ACCESS_SECRET` do `.env` por um valor aleatório. Este comando gera um:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+```
+
+Suba o banco e aplique as migrations:
+
 ```bash
 docker compose up -d
+```
+
+```bash
+npm run prisma:deploy -w @discord-2/server
 ```
 
 ```bash
 npm run dev
 ```
 
-Depois abra **http://localhost:5174**. A tela deve mostrar "Servidor: online" e "Banco: up".
-O servidor também responde direto em **http://localhost:3100/health**.
+Depois abra **http://localhost:5174**: você cai na tela de login. Crie uma conta em "Cadastre-se".
+A API responde em **http://localhost:3100/api** (por exemplo, `/api/health`).
 
 > Na primeira execução, o Firewall do Windows pode pedir permissão para o Node.js. Permitir em redes privadas é suficiente.
 
@@ -74,14 +86,26 @@ O servidor também responde direto em **http://localhost:3100/health**.
 | `npm run build`             | Build de produção                          |
 | `npm run db:up` / `db:down` | Sobe ou derruba o Postgres                 |
 
-O teste de integração com o banco real roda só com `DB_TESTS=1` (sempre ativo no CI):
+Os testes de integração com o banco real rodam só com `DB_TESTS=1` (sempre ativo no CI). Eles usam um banco separado, `discord2_test`, criado automaticamente; o banco de desenvolvimento não é tocado.
 
 ```powershell
 $env:DB_TESTS='1'; npm test -w @discord-2/server
 ```
+
+## Autenticação (resumo)
+
+- Senha com **argon2id**.
+- **Access token** JWT de 15 min, guardado só em memória no front.
+- **Refresh token** de 30 dias num cookie `httpOnly` + `SameSite=Lax`, com **rotação e detecção de reuso**.
+- Toda rota da API é privada por padrão (`@Public()` libera).
+- Rate limit em cadastro e login.
+
+Detalhes e motivos no [ROADMAP.md](ROADMAP.md#fase-1--contas--27102026).
 
 ## Problemas comuns
 
 - **`failed to connect to the docker API`**: o Docker Desktop não está aberto. Abra-o e espere o ícone ficar verde.
 - **Porta em uso**: mude a porta no `.env` (por exemplo `POSTGRES_PORT=5434`) e ajuste a `DATABASE_URL`.
 - **Banco: down na tela**: confira se o container está `healthy` com `docker compose ps`.
+- **Erro ao cadastrar logo depois de clonar**: faltou aplicar as migrations (`npm run prisma:deploy -w @discord-2/server`).
+- **O servidor não sobe e reclama de `JWT_ACCESS_SECRET`**: o `.env` é anterior à Fase 1. Copie as linhas novas do `.env.example`.

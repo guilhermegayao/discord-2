@@ -13,8 +13,8 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 | Fase | Entrega                                                                   | Status       |
 | ---- | ------------------------------------------------------------------------- | ------------ |
 | 0    | Fundação: monorepo, Postgres, `/health`, tela inicial, lint, testes, CI   | ✅ Concluída |
-| 1    | Contas: cadastro, login, sessão persistente com refresh token             | ⏳ Próxima   |
-| 2    | Servidores e chat: canais de texto, mensagens em tempo real, paginação    | —            |
+| 1    | Contas: cadastro, login, sessão persistente com refresh token             | ✅ Concluída |
+| 2    | Servidores e chat: canais de texto, mensagens em tempo real, paginação    | ⏳ Próxima   |
 | 3    | Social: convites, membros, presença, "digitando...", DMs                  | —            |
 | 4    | Voz com LiveKit                                                           | —            |
 | 5    | Compartilhamento de tela no navegador (getDisplayMedia)                   | —            |
@@ -65,19 +65,82 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 
 ### Pendências e observações
 
-- [ ] Criar o repositório no GitHub e dar o primeiro push (aguardando confirmação) para ver o CI rodar de verdade.
+- [x] Repositório público criado: https://github.com/guilhermegayao/discord-2 (CI verde).
+- [x] Actions atualizadas para `checkout@v7` / `setup-node@v7` (a v4 usava Node 20, obsoleto).
 - O bundle do web tem ~290 kB, a maior parte do Zod. Avaliar `zod/mini` no front se pesar.
 
 ---
 
-## Fase 1 — Contas (próxima)
+## Fase 1 — Contas ✅ (27/10/2026)
 
-Escopo previsto: cadastro, login, senha com argon2, JWT access token + refresh token (rotação), sessão persistente no web.
+### O que foi feito
+
+- **Banco**: models `User` e `Session` (IDs UUID v7), primeira migration.
+- **`shared`**: schemas `registerSchema`, `loginSchema`, `userSchema`, `authResponseSchema`, `apiErrorSchema`. As mesmas regras e mensagens valem no servidor e no formulário.
+- **Servidor** (todas as rotas agora em `/api`):
+  - `POST /api/auth/register`, `/login`, `/refresh`, `/logout` e `GET /api/users/me`.
+  - Senha com **argon2id** (64 MiB, 3 iterações).
+  - **Access token** JWT HS256 de 15 min. **Refresh token** aleatório de 30 dias num cookie `httpOnly`, `SameSite=Lax`, `path=/api/auth`; o banco guarda só o SHA-256.
+  - **Rotação com detecção de reuso**: usar um refresh token já usado revoga a família inteira (só daquele login; outros dispositivos seguem logados).
+  - **`AuthGuard` global**: toda rota é privada, a não ser que tenha `@Public()`.
+  - **Rate limit**: 120 req/min por IP no geral e 10 req/min em cadastro/login.
+  - Login com resposta e tempo iguais para "e-mail inexistente" e "senha errada".
+- **Web**:
+  - Páginas `/login` e `/register` (react-hook-form + schemas do shared); erros do servidor aparecem embaixo de cada campo.
+  - Home protegida com "Olá, {nome}" e botão Sair.
+  - Access token **só em memória**. Ao abrir o app, a sessão é restaurada pelo cookie.
+  - Cliente HTTP: em caso de 401, renova a sessão uma vez e repete a chamada. O refresh é _single-flight_ na aba e serializado entre abas com a **Web Locks API**.
+- **Testes (71 no total)**:
+  - shared: 12;
+  - server: 41, sendo 24 de unidade e 17 de integração com Postgres real num banco `discord2_test` separado;
+  - web: 18, com **MSW**.
+- **CI**: novo passo que falha se o `schema.prisma` mudar sem migration (`prisma:check`).
+- **Testado manualmente no navegador**: cadastro, validação, F5, sair, senha errada e login; `document.cookie` e `localStorage` ficam vazios.
+
+### Decisões tomadas
+
+| Decisão                                                      | Motivo                                                                                                                                                                                                |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Prefixo `/api` no servidor**, proxy do Vite sem reescrever | O cookie de refresh usa `path=/api/auth`. Se o proxy removesse o `/api`, o caminho visto pelo navegador e pelo servidor seriam diferentes e o cookie não seria enviado. O health virou `/api/health`. |
+| **Access token em memória**, refresh em cookie `httpOnly`    | Num XSS, não há token salvo para roubar. O cookie `SameSite=Lax` e restrito a `/api/auth` reduz o risco de CSRF e a exposição.                                                                        |
+| **Refresh token opaco** (não JWT) + hash SHA-256 no banco    | Pode ser revogado a qualquer momento. SHA-256 basta porque o token tem 256 bits aleatórios (senha precisa de argon2; token aleatório não).                                                            |
+| **Rotação com detecção de reuso** por família                | Padrão do OAuth 2.0 Security BCP: um token roubado e usado depois do legítimo derruba a sessão inteira.                                                                                               |
+| **Guard próprio** em vez de Passport                         | Para JWT simples o Passport só adiciona camadas. O guard tem ~30 linhas e dá para explicar cada uma.                                                                                                  |
+| **Seguro por padrão** (`AuthGuard` global + `@Public()`)     | Esquecer um decorator deixa a rota fechada, não aberta.                                                                                                                                               |
+| **Web Locks API** para o refresh entre abas                  | Duas abas renovando ao mesmo tempo usariam o mesmo cookie, e o servidor trataria como roubo. Com o lock, a segunda aba espera e já usa o cookie novo.                                                 |
+| **Banco de teste separado** (`<db>_test`)                    | Os testes limpam tabelas; nunca devem tocar o banco de dev. O `globalSetup` cria o banco e aplica as migrations. Ele se recusa a rodar se o nome não terminar em `_test`.                             |
+| **MSW** em vez de mockar `fetch`                             | Intercepta na rede: o teste exercita o cliente real (headers, retry, refresh) e não depende de como o código chama o `fetch`.                                                                         |
+| **Mobile (Fase 8)**: refresh token no corpo + SecureStore    | App nativo não tem cookie como o navegador. A API vai aceitar as duas formas quando chegarmos lá.                                                                                                     |
+
+### Imprevistos encontrados
+
+- **MSW 3 renomeou** `onUnhandledRequest` para `onUnhandledFrame`. Com o nome antigo, a opção era **ignorada em silêncio** e um teste que deveria garantir "nenhuma chamada à API" passava sem garantir nada. O typecheck pegou. Confirmei com um teste de mutação: tirei a validação do formulário e o teste falhou como devia.
+- **`globalSetup` do Vitest** roda no processo principal, onde o `test.env` da config ainda não foi aplicado. Por isso a URL do banco é lida de `project.config.env`. Além disso, o Vitest quebrava ao mostrar o erro original (`code.charCodeAt is not a function`); só deu para ver a causa rodando o setup direto no Node.
+- O lint (`@typescript-eslint/unbound-method`) pegou funções do contexto de auth declaradas como **métodos**: ao desestruturar (`const { login } = useAuth()`), um método perderia o `this`. Viraram propriedades com tipo de função.
+- O lint (`react-hooks/set-state-in-effect`) já tinha pegado na Fase 0 um `setState` síncrono dentro de efeito; nesta fase o padrão foi seguido desde o início.
+
+### Pendências e observações
+
+- O rate limit usa o IP da conexão. Atrás de um proxy (Fase 7) vai precisar de `trust proxy`, senão todo mundo terá o IP do proxy.
+- Cadastro revela se um e-mail já existe (inevitável sem verificação por e-mail). Aceitável por agora.
+- Sessões revogadas e expiradas ficam no banco; uma limpeza periódica pode entrar depois.
+
+---
+
+## Fase 2 — Servidores e chat (próxima)
+
+Escopo previsto: criar servidor, canais de texto, mensagens em tempo real (Socket.IO), histórico paginado.
 _Plano detalhado a ser apresentado antes de começar._
 
 ---
 
 ## Backlog (ideias para depois)
 
+- Teste **E2E com Playwright** (cadastro e login num navegador de verdade, rodando no CI).
+- Recuperação de senha por e-mail.
+- Login com Google/GitHub.
+- Avatar do usuário.
+- Tela de "sessões ativas" (ver e encerrar logins em outros dispositivos).
+- Limpeza periódica de sessões revogadas/expiradas.
 - Git hooks (husky + lint-staged) para rodar lint/format antes do commit.
 - Badge do CI e screenshots no README.
