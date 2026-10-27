@@ -1,0 +1,29 @@
+{
+  "name": "discord-2",
+  "version": "0.0.0",
+  "private": true,
+  "description": "App de chat, voz e compartilhamento de tela no estilo Discord",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "npm run build -w @discord-2/shared && concurrently -k -n shared,server,web -c magenta,blue,green \"npm run dev -w @discord-2/shared\" \"npm run dev -w @discord-2/server\" \"npm run dev -w @discord-2/web\"",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "npm run build -w @discord-2/shared && npm run typecheck --workspaces --if-present",
+    "test": "npm run build -w @discord-2/shared && npm run test --workspaces --if-present",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6",
+    "typescript": "^7.0.2"
+  }
+}
