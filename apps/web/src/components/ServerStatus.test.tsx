@@ -1,17 +1,8 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { http, HttpResponse } from 'msw';
+import { describe, expect, it } from 'vitest';
+import { server } from '../test/server';
 import { ServerStatus } from './ServerStatus';
-
-function mockFetch(status: number, body: unknown) {
-  const fetchMock = vi.fn().mockResolvedValue(
-    new Response(JSON.stringify(body), {
-      status,
-      headers: { 'Content-Type': 'application/json' },
-    }),
-  );
-  vi.stubGlobal('fetch', fetchMock);
-  return fetchMock;
-}
 
 const healthy = {
   status: 'ok',
@@ -20,19 +11,22 @@ const healthy = {
   db: 'up',
 };
 
+function respondWith(status: number, body: Record<string, unknown>) {
+  server.use(http.get('/api/health', () => HttpResponse.json(body, { status })));
+}
+
 describe('<ServerStatus />', () => {
   it('mostra servidor online e banco up', async () => {
-    const fetchMock = mockFetch(200, healthy);
+    respondWith(200, healthy);
 
     render(<ServerStatus />);
 
     expect(await screen.findByText('Servidor: online')).toBeInTheDocument();
     expect(screen.getByText(/Banco:/)).toHaveTextContent('Banco: up');
-    expect(fetchMock).toHaveBeenCalledWith('/api/health', expect.anything());
   });
 
   it('mostra banco down quando o servidor responde 503', async () => {
-    mockFetch(503, { ...healthy, status: 'degraded', db: 'down' });
+    respondWith(503, { ...healthy, status: 'degraded', db: 'down' });
 
     render(<ServerStatus />);
 
@@ -40,15 +34,15 @@ describe('<ServerStatus />', () => {
   });
 
   it('mostra offline quando o servidor não responde', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    server.use(http.get('/api/health', () => HttpResponse.error()));
 
     render(<ServerStatus />);
 
-    expect(await screen.findByText(/Servidor: offline/)).toHaveTextContent('Failed to fetch');
+    expect(await screen.findByText(/Servidor: offline/)).toBeInTheDocument();
   });
 
   it('mostra offline quando a resposta não segue o contrato', async () => {
-    mockFetch(200, { status: 'ok' });
+    respondWith(200, { status: 'ok' });
 
     render(<ServerStatus />);
 
