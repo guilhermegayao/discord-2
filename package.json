@@ -13,8 +13,8 @@
   "scripts": {
     "dev": "npm run build -w @discord-2/shared && concurrently -k -n shared,server,web -c magenta,blue,green \"npm run dev -w @discord-2/shared\" \"npm run dev -w @discord-2/server\" \"npm run dev -w @discord-2/web\"",
     "build": "npm run build --workspaces --if-present",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "lint": "npm run build -w @discord-2/shared && eslint .",
+    "lint:fix": "npm run build -w @discord-2/shared && eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "npm run build -w @discord-2/shared && npm run typecheck --workspaces --if-present",

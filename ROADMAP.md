@@ -60,6 +60,7 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 
 - O **WSL Ubuntu** está quebrado (o disco `ext4.vhdx` não foi encontrado). Não afeta o projeto: o Docker Desktop usa a distro própria dele e trabalhamos direto no Windows.
 - Na primeira instalação de dependências num workspace recém-criado, o npm às vezes **não grava** as dependências no `package.json`. Basta rodar o `npm i -w <pacote> ...` de novo e conferir.
+- O primeiro CI falhou no **lint**: o ESLint (com regras que usam tipos) precisa dos `.d.ts` do `shared`, que só existem depois do build. No PC passava porque o `dist/` já existia. Correção: o script `lint` compila o `shared` antes, igual a `test` e `typecheck`. Lição: para reproduzir o CI no PC, apague os artefatos de build antes.
 - O PowerShell 5.1 lê arquivos UTF-8 como ANSI e **corrompe acentos**. Não usar `Get-Content`/`Set-Content` para editar código.
 
 ### Pendências e observações
