@@ -4,6 +4,9 @@ build/
 coverage/
 *.tsbuildinfo
 
+# Cliente gerado pelo Prisma (recriado com `prisma generate`)
+apps/server/src/generated/
+
 # Variáveis de ambiente (nunca commitar)
 .env
 .env.*

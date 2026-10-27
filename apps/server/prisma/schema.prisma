@@ -1,0 +1,12 @@
+// Os models entram a partir da Fase 1 (usuários, sessões...).
+// A URL de conexão fica em prisma.config.ts (padrão do Prisma 7).
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
