@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import type { Server } from 'node:http';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module.js';
@@ -23,7 +24,9 @@ describe.runIf(process.env.DB_TESTS === '1')('GET /health com Postgres real', ()
   });
 
   it('conecta no banco e responde 200', async () => {
-    const res = await request(app.getHttpServer()).get('/health').expect(200);
+    const res = await request(app.getHttpServer() as Server)
+      .get('/health')
+      .expect(200);
 
     expect(res.body).toMatchObject({ status: 'ok', db: 'up' });
   });
