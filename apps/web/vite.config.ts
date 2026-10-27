@@ -17,12 +17,10 @@ export default defineConfig(({ mode }) => {
       port: Number(env.WEB_PORT ?? 5174),
       strictPort: true,
       // Em dev o navegador só fala com o Vite (mesma origem), e o Vite
-      // repassa /api/* para o servidor. Assim não precisamos de CORS.
+      // repassa /api/* para o servidor. Assim não precisamos de CORS, e o
+      // cookie do refresh token (path=/api/auth) funciona igual à produção.
       proxy: {
-        '/api': {
-          target: serverUrl,
-          rewrite: (path) => path.replace(/^\/api/, ''),
-        },
+        '/api': serverUrl,
       },
     },
     test: {

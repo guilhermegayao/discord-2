@@ -94,3 +94,101 @@ button:disabled {
   opacity: 0.6;
   cursor: wait;
 }
+
+.button--secondary {
+  margin-top: 0;
+  background: transparent;
+  border: 1px solid var(--muted);
+  color: var(--text);
+}
+
+a {
+  color: #00a8fc;
+}
+
+/* --- Login / cadastro --- */
+
+.auth {
+  width: min(420px, 100% - 32px);
+}
+
+.card {
+  display: grid;
+  gap: 0.9rem;
+  padding: 2rem;
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.card h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  text-align: center;
+}
+
+.card > .muted {
+  margin: 0;
+  text-align: center;
+}
+
+.card button[type='submit'] {
+  width: 100%;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.field label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.field input {
+  padding: 0.6rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.field input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+.field input[aria-invalid='true'] {
+  border-color: var(--down);
+}
+
+.field__error,
+.form-error {
+  color: #fa777c;
+  font-size: 0.85rem;
+}
+
+.form-error {
+  margin: 0;
+}
+
+/* --- Home --- */
+
+.home__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.home__header h1 {
+  margin-bottom: 0;
+}
+
+.home__header p {
+  margin-top: 0.25rem;
+}
