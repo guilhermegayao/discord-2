@@ -10,8 +10,9 @@ type State =
 export function ServerStatus() {
   const [state, setState] = useState<State>({ kind: 'loading' });
 
+  // Só atualiza o estado nos callbacks da promise (nunca de forma síncrona
+  // dentro do useEffect, o que causaria um render em cascata).
   const load = useCallback((signal?: AbortSignal) => {
-    setState({ kind: 'loading' });
     fetchHealth(signal)
       .then((health) => setState({ kind: 'online', health }))
       .catch((err: unknown) => {
@@ -26,6 +27,11 @@ export function ServerStatus() {
     load(controller.signal);
     return () => controller.abort();
   }, [load]);
+
+  const retry = () => {
+    setState({ kind: 'loading' });
+    load();
+  };
 
   return (
     <section className="status" aria-live="polite">
@@ -48,7 +54,7 @@ export function ServerStatus() {
           <li className="muted">Uptime: {Math.round(state.health.uptime)}s</li>
         </ul>
       )}
-      <button type="button" onClick={() => load()} disabled={state.kind === 'loading'}>
+      <button type="button" onClick={retry} disabled={state.kind === 'loading'}>
         Verificar de novo
       </button>
     </section>
