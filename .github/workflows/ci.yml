@@ -55,6 +55,11 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Aplica as migrations num banco limpo e falha se o schema.prisma
+      # tiver mudanças sem migration correspondente.
+      - name: Migrations em dia com o schema
+        run: npm run prisma:check -w @discord-2/server
+
       - name: Testes (inclui integração com Postgres)
         run: npm test
 
