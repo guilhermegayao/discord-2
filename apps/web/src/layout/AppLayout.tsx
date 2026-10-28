@@ -5,6 +5,7 @@ import { CreateGuildModal } from '../chat/CreateGuildModal';
 import { initials } from '../chat/format';
 import { useGuilds } from '../chat/hooks';
 import { useRealtimeSync } from '../realtime/useRealtimeSync';
+import { ScreenPicker } from '../desktop/ScreenPicker';
 import { VoiceProvider } from '../voice/VoiceProvider';
 
 /** Estrutura da área logada: barra de servidores à esquerda + conteúdo. */
@@ -73,6 +74,8 @@ export function AppLayout() {
         <Outlet />
 
         {creating && <CreateGuildModal onClose={() => setCreating(false)} />}
+        {/* Só aparece dentro do app desktop, quando alguém vai compartilhar a tela. */}
+        <ScreenPicker />
       </div>
     </VoiceProvider>
   );
