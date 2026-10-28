@@ -344,7 +344,9 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 
 ### Pendências e observações
 
-- **Teste com você**: duas contas, uma compartilha (aba com vídeo para testar o áudio, ou a tela inteira) e a outra assiste.
+- **Testado pelo Guilherme (28/10/2026)**: transmissão, 🔴 AO VIVO e "Assistir" funcionando entre duas contas.
+  - **Bug encontrado e corrigido**: com a janela maximizada, a barra do palco (⛶ e "Parar de assistir") ficava cortada, porque o palco encolhia para caber com os cartões.
+  - **Qualidade da imagem ruim no teste**; causas identificadas (ver backlog, "Refinamento de qualidade").
 - Compartilhar uma **janela** não leva o áudio dela em nenhum navegador → Fase 6 (Electron).
 - Firefox compartilha sem áudio; o Safari assiste normalmente.
 
@@ -394,7 +396,13 @@ _Plano detalhado a ser apresentado antes de começar._
 - Bloquear usuário; status personalizado ("ausente", "não perturbe").
 - Notificações (navegador/desktop) para DMs e menções.
 - Investigar o crash nativo raro dos testes no Windows (ver Fase 2).
-- **Refinamento de qualidade no fim do projeto** (pedido do Guilherme): ajustar voz (codec, supressão de ruído, ganho) e compartilhamento de tela (resolução, fps, taxa de bits por qualidade, codec como VP9/AV1), medindo com uso real.
+- **Refinamento de qualidade no fim do projeto** (pedido do Guilherme): ajustar voz (codec, supressão de ruído, ganho) e compartilhamento de tela (resolução, fps, taxa de bits por qualidade, codec como VP9/AV1), medindo com uso real. O que já sabemos do teste da Fase 5:
+  - **Tela**:
+    - Compartilhar a tela inteira com o próprio app visível gera o "espelho infinito", o pior caso para o codificador. No uso real, compartilhar a janela do jogo ou outro monitor.
+    - O _adaptive stream_ manda uma camada menor quando o vídeo aparece pequeno. Para quem está assistindo, forçar a melhor camada (`setVideoQuality(HIGH)`).
+    - Usar **VP9** na tela (comprime melhor, principalmente texto) e subir a taxa de bits do "Vídeo/jogo".
+    - Testar entre dois PCs: no mesmo PC, transmitir e assistir dividem o processador.
+  - **Ruído do microfone**: a supressão do navegador é básica. O Krisp do LiveKit só funciona no LiveKit Cloud (vamos auto-hospedar). Opção gratuita: **RNNoise** (filtro com IA, código aberto) via AudioWorklet, no navegador e no Electron. Junto: ganho automático e _push-to-talk_.
 - Tela: "quem está assistindo"/contador de espectadores, _picture-in-picture_, desenhar sobre a tela, gravação.
 - Voz: _push-to-talk_, volume individual por pessoa, câmera, chat de texto dentro do canal de voz.
 - Testar voz com um amigo no mesmo Wi-Fi (`LIVEKIT_NODE_IP` = IP da rede local + `vite --host`).
