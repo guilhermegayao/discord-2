@@ -16,8 +16,8 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 | 1    | Contas: cadastro, login, sessão persistente com refresh token             | ✅ Concluída |
 | 2    | Servidores e chat: canais de texto, mensagens em tempo real, paginação    | ✅ Concluída |
 | 3    | Social: convites, membros, presença, "digitando...", DMs                  | ✅ Concluída |
-| 4    | Voz com LiveKit                                                           | ⏳ Próxima   |
-| 5    | Compartilhamento de tela no navegador (getDisplayMedia)                   | —            |
+| 4    | Voz com LiveKit                                                           | ✅ Concluída |
+| 5    | Compartilhamento de tela no navegador (getDisplayMedia)                   | ⏳ Próxima   |
 | 6    | App desktop Electron: seletor de tela/janela, áudio do sistema, `.exe`    | —            |
 | 7    | Deploy gratuito (back, banco, LiveKit Cloud)                              | —            |
 | 8    | Mobile com Expo (incluindo tela no iOS via ReplayKit/Broadcast Extension) | —            |
@@ -244,9 +244,67 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 
 ---
 
-## Fase 4 — Voz (próxima)
+## Fase 4 — Voz ✅ (28/10/2026)
 
-Escopo previsto: canais de voz com LiveKit (local via Docker em dev).
+### O que foi feito
+
+- **Infra**: LiveKit `v1.13.10` no `docker-compose.yml`, configurado **inteiro pelo `.env`** (`LIVEKIT_CONFIG` montado pelo Compose).
+  - Mídia numa **porta UDP só** (7892) + TCP de reserva (7891); sinalização na 7890.
+  - O webhook aponta para o Nest no host (`host.docker.internal`).
+  - Está pronto para levar à VM da Fase 7.
+- **Banco**: canais agora são `TEXT`, `VOICE` (e `DM`). Canal de voz não tem mensagens. O servidor mantém pelo menos um canal de **texto**.
+- **Servidor**:
+  - `POST /api/channels/:id/voice-token`: token LiveKit de **10 min**, sala = id do canal, identidade = id do usuário, **só microfone** (`canPublishSources: microphone`). Só para membros.
+  - `POST /api/livekit/webhook`: **assinatura conferida sobre o corpo cru**. Entradas e saídas atualizam um registro em memória e emitem `voice:state` para o servidor.
+  - `GET /api/guilds/:id/voice-states` para quem abre o app depois. Ao subir, o servidor **sincroniza com o LiveKit**.
+  - Quem sai ou é expulso do servidor **cai da voz**. Apagar um canal de voz ou o servidor **encerra a sala**. Quem entrar sem ser membro (token antigo) é removido.
+- **Web**:
+  - Canais de voz na lista com quem está em cada um. No canal em que você está, a lista é ao vivo, com **anel verde em quem fala** e 🔇 em quem está mutado.
+  - **Painel de voz**: mutar, ensurdecer (também muta o microfone), escolher microfone e saída, sair.
+  - A conexão continua ao navegar por canais de texto e DMs. Ao sair da conta, desconecta.
+  - Mensagens claras para: microfone bloqueado (dá para ouvir mesmo assim), outra aba assumiu a sessão, removido do canal, sala encerrada, servidor de voz fora do ar.
+- **Testes (231 no total)**:
+  - shared: 31;
+  - server: 118, sendo 13 de voz: token decodificado e conferido, webhook assinado/adulterado, eventos por socket, expulsão e encerramento;
+  - web: 82, sendo 12 de voz com uma **sala LiveKit falsa**.
+- **Testado no navegador com o LiveKit real e duas contas**:
+  - o servidor sincronizou com o LiveKit;
+  - o Gui entrou e a Ana (fora da voz) o viu pelo webhook → socket;
+  - a Ana entrou e os dois se viram na mesma sala;
+  - cada um saiu e a lista atualizou dos dois lados.
+  - **O áudio em si não foi testado por mim**: o navegador embutido do app não tem microfone. O app mostrou o aviso de microfone bloqueado corretamente.
+
+### Decisões tomadas
+
+| Decisão                                                | Motivo                                                                                                                                    |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **Nest emite o token**, o LiveKit só confere           | O LiveKit não conhece nossos usuários. O token diz quem é (id), onde pode entrar (canal) e o que pode transmitir (só microfone).          |
+| **Webhook como fonte de "quem está na voz"**           | É o LiveKit que sabe quem está conectado. Confiar no cliente dizendo "entrei" seria manipulável.                                          |
+| **Corpo cru no webhook** (`express.raw` só nessa rota) | A assinatura é um hash dos bytes exatos. Interpretar o JSON antes mudaria os bytes e a verificação falharia.                              |
+| **Quem fala só para quem está na sala**                | Avisar "fulano falando" a todo o servidor geraria tráfego constante. Quem está fora vê quem está no canal; quem está dentro vê quem fala. |
+| **Uma porta UDP**                                      | Faixas grandes de portas UDP no Docker Desktop do Windows são lentas. O LiveKit multiplexa tudo numa porta.                               |
+| **`VoiceProvider` no topo da área logada**             | A voz não cai ao trocar de página (como no Discord), e o logout desconecta.                                                               |
+| **Estado da sala lido em eventos, não no render**      | O lint (`react-hooks/refs`) pegou a leitura do `ref` da sala durante o render. Agora os eventos do LiveKit atualizam um estado.           |
+
+### Imprevistos encontrados
+
+- O `prisma migrate dev` continua não interativo aqui; a migration do `VOICE` foi gerada com `migrate diff`.
+- O lint pegou dois problemas de React: ler `ref` durante o render e buscar dispositivos de áudio **durante o render** (passou para `useEffect`).
+- Depois de **sair da voz por vontade própria**, o aviso antigo do microfone continuava na tela; corrigido.
+- Num comando confuso do git criei um _stash_ por engano. Conferi que era cópia idêntica do que já estava commitado e removi.
+- Os testes da sala falsa precisaram de um gancho (`nextRoom.setup`) para simular microfone bloqueado e falha de conexão, porque `vi.spyOn` no protótipo não pega campos de instância.
+
+### Pendências e observações
+
+- **Teste de áudio real com você**: duas abas (ou dois navegadores) no mesmo PC, de **fone de ouvido** para não dar microfonia.
+- Presença de voz e registro de quem está na voz são em memória (com várias instâncias, Redis).
+- Webhooks podem chegar fora de ordem em casos raros; o registro é idempotente, mas não reordena eventos.
+
+---
+
+## Fase 5 — Compartilhamento de tela no navegador (próxima)
+
+Escopo previsto: compartilhar tela pelo navegador (`getDisplayMedia`) dentro do canal de voz, com qualidade configurável.
 _Plano detalhado a ser apresentado antes de começar._
 
 ---
@@ -270,6 +328,7 @@ _Plano detalhado a ser apresentado antes de começar._
 - **Fase 1:** hash de senha (argon2id) vs hash de token (SHA-256); access token vs refresh token; onde guardar token no front (memória, localStorage, cookie httpOnly; XSS e CSRF); rotação com detecção de reuso; ataques de timing e enumeração de usuários; seguro por padrão (guard global); MSW vs mock de `fetch`; teste de mutação; Web Locks e corrida entre abas.
 - **Fase 2:** paginação por cursor vs OFFSET; UUID v7; REST para escrita e WebSocket para distribuição; rooms do Socket.IO e escala horizontal (adapter Redis); UI otimista e reconciliação com `nonce`; transações; 404 vs 403; cache como fonte da tela (TanStack Query); testes instáveis (flaky) e como transformá-los em testes determinísticos; ordem dos guards no Nest.
 - **Fase 3:** presença (contagem de conexões, prazo contra "pisca"); eventos efêmeros vs persistidos; dependência circular entre módulos e como quebrar; modelagem de DM como canal (union types e o compilador apontando os casos); guards globais em HTTP vs WebSocket; open redirect; rate limit contra força bruta de códigos; testes que passam "por acaso" e como a mutação revela; testar dois usuários com origens diferentes.
+- **Fase 4:** WebRTC e por que um SFU (LiveKit) em vez de P2P; token de acesso com permissões (grants); webhooks assinados e verificação sobre o corpo cru; fonte da verdade (servidor de mídia) vs. estado derivado; UDP/TCP, ICE e o IP anunciado; refs vs. estado no React; dublês de bibliotecas de mídia nos testes.
 
 ---
 
@@ -286,6 +345,8 @@ _Plano detalhado a ser apresentado antes de começar._
 - Bloquear usuário; status personalizado ("ausente", "não perturbe").
 - Notificações (navegador/desktop) para DMs e menções.
 - Investigar o crash nativo raro dos testes no Windows (ver Fase 2).
+- Voz: _push-to-talk_, volume individual por pessoa, câmera, chat de texto dentro do canal de voz.
+- Testar voz com um amigo no mesmo Wi-Fi (`LIVEKIT_NODE_IP` = IP da rede local + `vite --host`).
 - Recuperação de senha por e-mail.
 - Login com Google/GitHub.
 - Avatar do usuário.

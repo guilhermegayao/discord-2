@@ -8,11 +8,12 @@ App de chat, voz e **compartilhamento de tela** no estilo Discord, feito para us
 
 | Parte         | Tecnologias                                                                          |
 | ------------- | ------------------------------------------------------------------------------------ |
-| Servidor      | NestJS 12, Prisma 7, PostgreSQL 17, Socket.IO, Zod                                   |
-| Web           | React 19, Vite 8, TanStack Query, React Router, TypeScript                           |
+| Servidor      | NestJS 12, Prisma 7, PostgreSQL 17, Socket.IO, Zod, LiveKit Server SDK               |
+| Voz           | LiveKit (servidor de mídia WebRTC, rodando no Docker)                                |
+| Web           | React 19, Vite 8, TanStack Query, React Router, livekit-client, TypeScript           |
 | Compartilhado | `@discord-2/shared`: schemas Zod, tipos e eventos do socket usados por todos os apps |
 | Qualidade     | Vitest, Testing Library, MSW, supertest, ESLint, Prettier, GitHub Actions            |
-| Em breve      | LiveKit (voz e tela), Electron (desktop), Expo (mobile)                              |
+| Em breve      | Compartilhamento de tela, Electron (desktop), Expo (mobile)                          |
 
 ## O que já funciona
 
@@ -25,6 +26,7 @@ App de chat, voz e **compartilhamento de tela** no estilo Discord, feito para us
 - Lista de membros com **online/offline** ao vivo, sair do servidor e expulsar.
 - "**Fulano está digitando…**"
 - **Mensagens diretas** entre quem divide um servidor.
+- **Canais de voz**: veja quem está em cada um e quem está falando, com mutar, ensurdecer e escolha de microfone. A voz continua conectada enquanto você navega.
 
 ### Testar com duas contas no mesmo navegador
 
@@ -124,4 +126,8 @@ Detalhes e motivos no [ROADMAP.md](ROADMAP.md#fase-1--contas--27102026).
 - **Porta em uso**: mude a porta no `.env` (por exemplo `POSTGRES_PORT=5434`) e ajuste a `DATABASE_URL`.
 - **Banco: down na tela**: confira se o container está `healthy` com `docker compose ps`.
 - **Erro ao cadastrar logo depois de clonar**: faltou aplicar as migrations (`npm run prisma:deploy -w @discord-2/server`).
+- **"Não foi possível entrar no canal de voz"**: o container do LiveKit não está rodando (`docker compose ps`). Suba tudo com `docker compose up -d`.
+- **"O navegador bloqueou o microfone"**: clique no cadeado da barra de endereço e permita o microfone para `localhost`.
+- **Microfonia ao testar voz com duas abas no mesmo PC**: use fone de ouvido.
+- **O servidor não sobe e reclama de `LIVEKIT_*`**: o `.env` é anterior à Fase 4. Copie as linhas novas do `.env.example`.
 - **O servidor não sobe e reclama de `JWT_ACCESS_SECRET`**: o `.env` é anterior à Fase 1. Copie as linhas novas do `.env.example`.
