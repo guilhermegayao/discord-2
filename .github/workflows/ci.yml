@@ -65,3 +65,34 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  desktop:
+    name: Instalador Windows (.exe)
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Testes do app desktop
+        run: npm run build -w @discord-2/shared && npm test -w @discord-2/desktop
+
+      # Sem certificado de assinatura: o Windows SmartScreen vai avisar na
+      # primeira execução (ver README).
+      - name: Gerar instalador
+        run: npm run dist:desktop
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: discord-2-windows
+          path: apps/desktop/release/*.exe
+          if-no-files-found: error
+          retention-days: 14
