@@ -18,7 +18,8 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 | 3    | Social: convites, membros, presença, "digitando...", DMs                  | ✅ Concluída |
 | 4    | Voz com LiveKit                                                           | ✅ Concluída |
 | 5    | Compartilhamento de tela no navegador (getDisplayMedia)                   | ✅ Concluída |
-| 6    | App desktop Electron: seletor de tela/janela, áudio do sistema, `.exe`    | ⏳ Próxima   |
+| 6a   | App desktop Electron: seletor próprio de tela/janela, instalador `.exe`   | ✅ Concluída |
+| 6b   | Áudio do sistema no app sem eco (módulo nativo do Windows)                | ⏳ Próxima   |
 | 7    | Deploy gratuito (back, banco, LiveKit Cloud)                              | —            |
 | 8    | Mobile com Expo (incluindo tela no iOS via ReplayKit/Broadcast Extension) | —            |
 
@@ -352,10 +353,58 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 
 ---
 
-## Fase 6 — App desktop Electron (próxima)
+## Fase 6a — App desktop Electron ✅ (28/10/2026)
 
-Escopo previsto: empacotar o web como app desktop, com seletor próprio de tela/janela, áudio do sistema e instalador `.exe`.
-_Plano detalhado a ser apresentado antes de começar._
+### O que foi feito
+
+- **Novo pacote `apps/desktop`** (Electron 44, CommonJS):
+  - A janela carrega o front web (em dev, `http://localhost:5174`; dá para trocar com a variável `DISCORD2_APP_URL`).
+  - Janela segura: `contextIsolation`, `sandbox` e sem `nodeIntegration`. A página só vê o que o `preload` expõe em `window.desktop`.
+  - Navegação presa ao app: links de fora abrem no navegador padrão (só `http`/`https`); permissões (microfone, captura de tela, tela cheia, copiar) só para a origem do app.
+  - Uma instância só: abrir de novo traz a janela existente para frente.
+- **Seletor próprio de tela/janela**:
+  - O Electron intercepta o "compartilhar tela" (`setDisplayMediaRequestHandler`), lista telas e janelas com miniatura e ícone (`desktopCapturer`) e manda para o front pela ponte.
+  - O front mostra um modal no estilo do app, com abas **Telas/Janelas**; duplo clique compartilha direto; Esc ou Cancelar desiste sem erro.
+  - A **própria janela do app não aparece** na lista (evita o "espelho infinito"), nem janelas sem imagem.
+  - O processo principal só aceita de volta um id que ele mesmo ofereceu, e o pedido expira em 2 minutos.
+  - No navegador comum nada muda: sem `window.desktop`, o seletor não aparece.
+- **Instalador `.exe`** com electron-builder (NSIS): instala só para o usuário, deixa escolher a pasta e cria atalho na área de trabalho. O ícone é gerado por um script sem dependências (`npm run icon -w @discord-2/desktop`).
+- **CI**: novo job em `windows-latest` que roda os testes do desktop, gera o instalador e guarda o `.exe` como artefato por 14 dias.
+- **Testes (275 no total)**: shared 31; server 121; web 99, com 6 novos do seletor; desktop 24, cobrindo navegação, permissões, filtro de fontes, pedidos do seletor e canais IPC.
+- **Testado aqui**: o instalador foi gerado (≈115 MB), o pacote contém só `dist/*.js` e `package.json`, e o app empacotado abre a janela "discord-2". **O fluxo de compartilhar pelo seletor é conferido por você.**
+
+### Decisões tomadas
+
+| Decisão                                                 | Motivo                                                                                                                                                                |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Dividir em 6a e 6b** (escolha do Guilherme)           | O áudio do sistema do Electron (`loopback`) captura **tudo** que sai no PC, inclusive a voz da chamada: quem assiste ouviria o próprio eco. Fone não resolve. Ver 6b. |
+| **O app carrega o front por URL**, em vez de embutir    | Uma versão só do front para navegador e app; atualizar o site atualiza o app. Depois da Fase 7, a URL padrão vira a do deploy.                                        |
+| **Seletor feito no React**, não numa janela do Electron | Fica com a cara do app e é testável com Testing Library. O Electron só fornece a lista e recebe a escolha.                                                            |
+| **`preload` repete os nomes dos canais IPC**            | Com `sandbox`, o preload não pode importar arquivos do projeto. Um teste garante que os nomes batem e que o preload só importa `electron`.                            |
+| **Sem assinatura de código**                            | Certificado é pago. O Windows SmartScreen avisa na primeira execução ("Mais informações → Executar assim mesmo"); está no README.                                     |
+
+### Imprevistos encontrados
+
+- O `npm install` num workspace novo não salvou as dependências na primeira vez (de novo); rodar outra vez resolveu.
+- `import.meta` não existe em CommonJS: os testes do desktop usam `__dirname`.
+- O `.gitignore` ignorava qualquer pasta `build/`, inclusive a do ícone do instalador; ganhou uma exceção para `apps/desktop/build/`.
+
+### Pendências e observações
+
+- **Teste manual do Guilherme**: instalar o `.exe`, compartilhar uma janela pelo seletor e assistir de outra conta.
+- O app instalado só funciona com o projeto rodando (`npm run dev`) até a Fase 7 dar uma URL pública.
+- Sem atualização automática por enquanto (precisa de um lugar para publicar versões; fica para depois da Fase 7).
+
+---
+
+## Fase 6b — Áudio do sistema sem eco (próxima)
+
+Plano:
+
+- **Módulo nativo em C++** (node-addon-api) usando a captura de áudio **por processo** do Windows (`PROCESS_LOOPBACK_MODE_EXCLUDE_TARGET_PROCESS_TREE`): captura o som do PC **menos o próprio app**, então a voz da chamada não volta para quem assiste.
+- O áudio entra no LiveKit como `screen_share_audio`, junto com a tela escolhida no seletor.
+- Requisitos: **Windows 11** e **Visual Studio Build Tools** para compilar (instalação global: pedir autorização antes). No CI, o runner do Windows já tem as ferramentas.
+- Referência estudada: `thomas-quant/wasapi-loopback`. Preferência por escrever o nosso, pequeno e com testes.
 
 ---
 
@@ -380,6 +429,7 @@ _Plano detalhado a ser apresentado antes de começar._
 - **Fase 3:** presença (contagem de conexões, prazo contra "pisca"); eventos efêmeros vs persistidos; dependência circular entre módulos e como quebrar; modelagem de DM como canal (union types e o compilador apontando os casos); guards globais em HTTP vs WebSocket; open redirect; rate limit contra força bruta de códigos; testes que passam "por acaso" e como a mutação revela; testar dois usuários com origens diferentes.
 - **Fase 4:** WebRTC e por que um SFU (LiveKit) em vez de P2P; token de acesso com permissões (grants); webhooks assinados e verificação sobre o corpo cru; fonte da verdade (servidor de mídia) vs. estado derivado; UDP/TCP, ICE e o IP anunciado; refs vs. estado no React; dublês de bibliotecas de mídia nos testes.
 - **Fase 5:** `getDisplayMedia` e limites por navegador; simulcast e adaptive stream; `contentHint` (motion vs detail); taxa de bits vs resolução vs fps; assinatura seletiva de faixas para economizar banda; Fullscreen API.
+- **Fase 6a:** processos do Electron (main, preload, renderer); `contextIsolation`, `sandbox` e a superfície de ataque de um app desktop; IPC e validar quem envia; permissões por origem; empacotamento e instalador (NSIS, asar); assinatura de código e SmartScreen; build no CI em outro sistema operacional.
 
 ---
 

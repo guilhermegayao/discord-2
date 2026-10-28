@@ -28,6 +28,7 @@ App de chat, voz e **compartilhamento de tela** no estilo Discord, feito para us
 - **Mensagens diretas** entre quem divide um servidor.
 - **Canais de voz**: veja quem está em cada um e quem está falando, com mutar, ensurdecer e escolha de microfone. A voz continua conectada enquanto você navega.
 - **Compartilhamento de tela** dentro da voz, com três qualidades (Vídeo/jogo, Texto/código, Economia) e áudio da aba ou do sistema (Chrome/Edge). Quem quer assistir clica em "Assistir", com tela cheia. Quem não assiste não gasta internet com a imagem.
+- **App para Windows** (Electron) com seletor próprio de tela/janela e instalador `.exe`.
 
 ### Testar com duas contas no mesmo navegador
 
@@ -38,6 +39,7 @@ Cada origem guarda seus próprios cookies. Use uma conta em `http://localhost:51
 ```
 discord-2/
 ├── apps/
+│   ├── desktop/   → app Windows (Electron) + instalador
 │   ├── server/    → API NestJS + Prisma
 │   └── web/       → front-end React + Vite
 ├── packages/
@@ -95,21 +97,33 @@ A API responde em **http://localhost:3100/api** (por exemplo, `/api/health`).
 
 ## Scripts
 
-| Comando                     | O que faz                                  |
-| --------------------------- | ------------------------------------------ |
-| `npm run dev`               | Sobe shared (watch), servidor e web juntos |
-| `npm test`                  | Roda os testes de todos os pacotes         |
-| `npm run lint`              | ESLint em todo o monorepo                  |
-| `npm run format`            | Formata com Prettier                       |
-| `npm run typecheck`         | Checagem de tipos em todos os pacotes      |
-| `npm run build`             | Build de produção                          |
-| `npm run db:up` / `db:down` | Sobe ou derruba o Postgres                 |
+| Comando                     | O que faz                                      |
+| --------------------------- | ---------------------------------------------- |
+| `npm run dev`               | Sobe shared (watch), servidor e web juntos     |
+| `npm test`                  | Roda os testes de todos os pacotes             |
+| `npm run lint`              | ESLint em todo o monorepo                      |
+| `npm run format`            | Formata com Prettier                           |
+| `npm run typecheck`         | Checagem de tipos em todos os pacotes          |
+| `npm run build`             | Build de produção                              |
+| `npm run db:up` / `db:down` | Sobe ou derruba o Postgres                     |
+| `npm run dev:desktop`       | Abre o app desktop (com `npm run dev` rodando) |
+| `npm run dist:desktop`      | Gera o instalador em `apps/desktop/release/`   |
 
 Os testes de integração com o banco real rodam só com `DB_TESTS=1` (sempre ativo no CI). Eles usam um banco separado, `discord2_test`, criado automaticamente; o banco de desenvolvimento não é tocado.
 
 ```powershell
 $env:DB_TESTS='1'; npm test -w @discord-2/server
 ```
+
+## App para Windows
+
+O app desktop abre o mesmo front do navegador numa janela própria, com um seletor de tela/janela no estilo do app.
+
+- **Baixar**: na aba _Actions_ do GitHub, abra a execução mais recente do CI e baixe o artefato `discord-2-windows` (um `.zip` com o instalador).
+- **Gerar na sua máquina**: `npm run dist:desktop` (o `.exe` sai em `apps/desktop/release/`).
+- **Primeira execução**: o instalador não é assinado, então o Windows SmartScreen mostra "O Windows protegeu o computador". Clique em **Mais informações → Executar assim mesmo**.
+- Por enquanto o app aponta para `http://localhost:5174`, então o projeto precisa estar rodando (`npm run dev`). Para outra URL, defina `DISCORD2_APP_URL` antes de abrir.
+- O áudio do sistema ainda não vai junto na transmissão pelo app (chega na Fase 6b). Para transmitir com som, use o navegador e compartilhe uma aba.
 
 ## Autenticação (resumo)
 
