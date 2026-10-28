@@ -580,6 +580,147 @@ textarea:focus-visible {
   color: var(--muted);
 }
 
+/* --- Voz --- */
+
+.channel-bar__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.channel-bar nav {
+  overflow-y: visible;
+}
+
+.voice-channel__row {
+  display: flex;
+  align-items: center;
+}
+
+.voice-channel__join {
+  flex: 1;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.voice-channel__delete {
+  visibility: hidden;
+}
+
+.voice-channel__row:hover .voice-channel__delete,
+.voice-channel__row:focus-within .voice-channel__delete {
+  visibility: visible;
+}
+
+.voice-channel__people {
+  display: grid;
+  gap: 2px;
+  padding: 2px 0 6px 28px;
+}
+
+.voice-person {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.voice-person__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.avatar--tiny {
+  width: 24px;
+  height: 24px;
+  font-size: 0.6rem;
+}
+
+/* Quem está falando: anel verde, como no Discord. */
+.avatar--speaking {
+  box-shadow: 0 0 0 2px var(--up);
+}
+
+.voice-panel {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--bg);
+  background: #232428;
+  font-size: 0.85rem;
+}
+
+.voice-panel__status {
+  display: grid;
+}
+
+.voice-panel__ok {
+  color: var(--up);
+}
+
+.voice-panel__buttons {
+  display: flex;
+  justify-content: space-between;
+}
+
+.voice-panel__buttons .icon-button {
+  font-size: 1.1rem;
+}
+
+.voice-panel__buttons .icon-button[aria-pressed='true'] {
+  background: rgb(242 63 67 / 0.2);
+  border-radius: 4px;
+}
+
+.voice-panel__leave:hover {
+  background: rgb(242 63 67 / 0.3);
+  border-radius: 4px;
+}
+
+.voice-panel__warning,
+.voice-panel--error p {
+  margin: 0;
+  color: #fa777c;
+}
+
+.voice-panel__devices {
+  display: grid;
+  gap: 8px;
+}
+
+.channel-type {
+  display: flex;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.channel-type legend {
+  margin-bottom: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* --- Membros --- */
 
 .member-bar {

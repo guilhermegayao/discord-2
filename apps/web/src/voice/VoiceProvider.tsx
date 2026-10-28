@@ -1,0 +1,241 @@
+import {
+  DisconnectReason,
+  type Participant,
+  type RemoteAudioTrack,
+  type RemoteTrack,
+  type Room,
+  RoomEvent,
+  Track,
+} from 'livekit-client';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import * as voiceApi from '../api/voice';
+import { createRoom } from './livekit';
+import {
+  type LiveParticipant,
+  type VoiceChannelRef,
+  VoiceContext,
+  type VoiceContextValue,
+  type VoiceStatus,
+} from './VoiceContext';
+
+const DISCONNECT_MESSAGES: Partial<Record<DisconnectReason, string>> = {
+  [DisconnectReason.DUPLICATE_IDENTITY]: 'Você entrou na voz em outra aba ou dispositivo.',
+  [DisconnectReason.PARTICIPANT_REMOVED]: 'Você foi removido do canal de voz.',
+  [DisconnectReason.ROOM_DELETED]: 'O canal de voz foi encerrado.',
+};
+
+function micErrorMessage(err: unknown): string {
+  const name = err instanceof Error ? err.name : '';
+  if (name === 'NotAllowedError') {
+    return 'O navegador bloqueou o microfone. Permita o acesso (ícone de cadeado na barra de endereço) e tente de novo.';
+  }
+  if (name === 'NotFoundError') return 'Nenhum microfone encontrado.';
+  return 'Não foi possível usar o microfone.';
+}
+
+function setVolume(track: unknown, volume: number): void {
+  const audio = track as Partial<RemoteAudioTrack> | undefined;
+  audio?.setVolume?.(volume);
+}
+
+/** Volume de todo mundo que eu ouço (0 = ensurdecido). */
+function setRemoteVolume(room: Room, volume: number): void {
+  room.remoteParticipants.forEach((p) =>
+    p.audioTrackPublications.forEach((pub) => setVolume(pub.track, volume)),
+  );
+}
+
+type Person = Omit<LiveParticipant, 'speaking'>;
+
+/** Foto de quem está na sala agora (lida só em eventos, nunca durante o render). */
+function snapshot(room: Room): Person[] {
+  const toPerson = (p: Participant, isLocal: boolean): Person => ({
+    id: p.identity,
+    name: p.name || p.identity,
+    muted: !p.isMicrophoneEnabled,
+    isLocal,
+  });
+  return [
+    toPerson(room.localParticipant, true),
+    ...[...room.remoteParticipants.values()].map((p) => toPerson(p, false)),
+  ];
+}
+
+/**
+ * Mantém a conexão de voz viva enquanto a pessoa navega pelo app (como no
+ * Discord: dá para ler outro canal de texto sem cair da voz). Fica dentro da
+ * área logada; ao sair da conta, desconecta.
+ */
+export function VoiceProvider({ children }: { children: ReactNode }) {
+  const roomRef = useRef<Room | null>(null);
+  const audioContainer = useRef<HTMLDivElement>(null);
+  const [status, setStatus] = useState<VoiceStatus>('idle');
+  const [channel, setChannel] = useState<VoiceChannelRef | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [micEnabled, setMicEnabled] = useState(false);
+  const [deafened, setDeafened] = useState(false);
+  const [people, setPeople] = useState<Person[]>([]);
+  const [speaking, setSpeaking] = useState<Set<string>>(new Set());
+  const deafenedRef = useRef(false);
+  /** Estado do microfone antes de ensurdecer, para restaurar depois. */
+  const micBeforeDeafen = useRef(true);
+
+  const reset = useCallback(() => {
+    roomRef.current = null;
+    setStatus('idle');
+    setChannel(null);
+    setMicEnabled(false);
+    setDeafened(false);
+    deafenedRef.current = false;
+    setPeople([]);
+    setSpeaking(new Set());
+  }, []);
+
+  const leave = useCallback(async () => {
+    const room = roomRef.current;
+    reset();
+    // Saiu porque quis: avisos da sessão anterior (ex.: microfone) não valem mais.
+    setError(null);
+    await room?.disconnect();
+  }, [reset]);
+
+  const join = useCallback(
+    async (target: VoiceChannelRef) => {
+      if (roomRef.current && channel?.id === target.id) return;
+      if (roomRef.current) await leave();
+
+      setError(null);
+      setStatus('connecting');
+      setChannel(target);
+
+      let room: Room | null = null;
+      try {
+        const { url, token } = await voiceApi.getVoiceToken(target.id);
+        const current = createRoom();
+        room = current;
+        roomRef.current = current;
+        const refresh = () => setPeople(snapshot(current));
+
+        current
+          .on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) =>
+            setSpeaking(new Set(speakers.map((s) => s.identity))),
+          )
+          .on(RoomEvent.ParticipantConnected, refresh)
+          .on(RoomEvent.ParticipantDisconnected, refresh)
+          .on(RoomEvent.TrackMuted, refresh)
+          .on(RoomEvent.TrackUnmuted, refresh)
+          .on(RoomEvent.LocalTrackPublished, refresh)
+          .on(RoomEvent.TrackSubscribed, (track: RemoteTrack) => {
+            if (track.kind !== Track.Kind.Audio) return;
+            audioContainer.current?.appendChild(track.attach());
+            setVolume(track, deafenedRef.current ? 0 : 1);
+            refresh();
+          })
+          .on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
+            track.detach().forEach((el) => el.remove());
+            refresh();
+          })
+          .on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
+            // Saída pedida por nós já foi tratada em leave(); aqui são as outras.
+            if (roomRef.current !== current) return;
+            reset();
+            const message = reason !== undefined ? DISCONNECT_MESSAGES[reason] : undefined;
+            if (message) setError(message);
+          });
+
+        await current.connect(url, token);
+        try {
+          await current.localParticipant.setMicrophoneEnabled(true);
+          setMicEnabled(true);
+        } catch (micError) {
+          // Sem microfone dá para ouvir, mas avisamos o motivo.
+          setError(micErrorMessage(micError));
+          setMicEnabled(false);
+        }
+        setStatus('connected');
+        refresh();
+      } catch {
+        if (roomRef.current === room) {
+          reset();
+          await room?.disconnect();
+        }
+        setError('Não foi possível entrar no canal de voz. O servidor de voz está rodando?');
+      }
+    },
+    [channel?.id, leave, reset],
+  );
+
+  const toggleMic = useCallback(async () => {
+    const room = roomRef.current;
+    if (!room) return;
+    const next = !room.localParticipant.isMicrophoneEnabled;
+    try {
+      await room.localParticipant.setMicrophoneEnabled(next);
+      setMicEnabled(next);
+      // Desmutar enquanto ensurdecido tira o ensurdecer (igual ao Discord).
+      if (next && deafenedRef.current) {
+        deafenedRef.current = false;
+        setDeafened(false);
+        setRemoteVolume(room, 1);
+      }
+    } catch (err) {
+      setError(micErrorMessage(err));
+    }
+    setPeople(snapshot(room));
+  }, []);
+
+  /** Ensurdecer = não ouvir ninguém e também mutar o microfone. */
+  const toggleDeafen = useCallback(async () => {
+    const room = roomRef.current;
+    if (!room) return;
+    const next = !deafenedRef.current;
+    deafenedRef.current = next;
+    setDeafened(next);
+    setRemoteVolume(room, next ? 0 : 1);
+    if (next) {
+      micBeforeDeafen.current = room.localParticipant.isMicrophoneEnabled;
+      await room.localParticipant.setMicrophoneEnabled(false);
+      setMicEnabled(false);
+    } else if (micBeforeDeafen.current) {
+      await room.localParticipant.setMicrophoneEnabled(true).catch(() => undefined);
+      setMicEnabled(room.localParticipant.isMicrophoneEnabled);
+    }
+    setPeople(snapshot(room));
+  }, []);
+
+  const switchDevice = useCallback(async (kind: 'audioinput' | 'audiooutput', deviceId: string) => {
+    await roomRef.current?.switchActiveDevice(kind, deviceId);
+  }, []);
+
+  // Saiu da área logada (logout): desconecta.
+  useEffect(
+    () => () => {
+      void roomRef.current?.disconnect();
+    },
+    [],
+  );
+
+  const value: VoiceContextValue = {
+    status,
+    channel,
+    error,
+    micEnabled,
+    deafened,
+    participants:
+      status === 'connected' ? people.map((p) => ({ ...p, speaking: speaking.has(p.id) })) : [],
+    join,
+    leave,
+    toggleMic,
+    toggleDeafen,
+    switchDevice,
+    dismissError: () => setError(null),
+  };
+
+  return (
+    <VoiceContext value={value}>
+      {children}
+      {/* Os <audio> das outras pessoas ficam aqui, fora da tela. */}
+      <div ref={audioContainer} hidden aria-hidden="true" />
+    </VoiceContext>
+  );
+}

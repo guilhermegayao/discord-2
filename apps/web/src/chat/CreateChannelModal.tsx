@@ -32,15 +32,25 @@ export function CreateChannelModal({ guildId, onClose }: Props) {
     try {
       const channel = await createChannel.mutateAsync(data);
       onClose();
-      await navigate(`/channels/${guildId}/${channel.id}`);
+      // Canal de texto abre; canal de voz só aparece na lista (entrar é um clique a mais).
+      if (channel.type === 'TEXT') await navigate(`/channels/${guildId}/${channel.id}`);
     } catch (err) {
       applyServerErrors(err, setError);
     }
   });
 
   return (
-    <Modal title="Criar canal de texto" onClose={onClose}>
+    <Modal title="Criar canal" onClose={onClose}>
       <form className="modal__form" onSubmit={(e) => void onSubmit(e)} noValidate>
+        <fieldset className="channel-type">
+          <legend>Tipo do canal</legend>
+          <label>
+            <input type="radio" value="TEXT" defaultChecked {...register('type')} /> # Texto
+          </label>
+          <label>
+            <input type="radio" value="VOICE" {...register('type')} /> 🔊 Voz
+          </label>
+        </fieldset>
         <FormField
           label="Nome do canal"
           placeholder="novo-canal"

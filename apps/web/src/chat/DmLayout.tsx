@@ -3,6 +3,7 @@ import { initials } from './format';
 import { Composer } from './Composer';
 import { MessageList } from './MessageList';
 import { isOnline, useDms, usePresence } from './socialHooks';
+import { VoicePanel } from '../voice/VoicePanel';
 
 /** /channels/@me — lista de conversas diretas + a conversa aberta. */
 export function DmLayout() {
@@ -42,6 +43,8 @@ export function DmLayout() {
             })}
           </ul>
         </nav>
+        {/* A voz continua conectada lendo DMs; o painel fica no mesmo lugar. */}
+        <VoicePanel />
       </aside>
       <Outlet />
     </>

@@ -5,6 +5,7 @@ import type {
   MemberDto,
   MessageDto,
   PublicUserDto,
+  VoiceChannelStateDto,
 } from '@discord-2/shared';
 import type { InfiniteData } from '@tanstack/react-query';
 
@@ -19,7 +20,19 @@ export const queryKeys = {
   presence: ['presence'] as const,
   /** Quem está digitando em cada canal (efêmero, nunca vai para a API). */
   typing: (channelId: string) => ['typing', channelId] as const,
+  /** Quem está em cada canal de voz do servidor. */
+  voiceStates: (guildId: string) => ['voiceStates', guildId] as const,
 };
+
+/** Troca o estado de um canal de voz na lista; canal vazio sai da lista. */
+export function upsertVoiceState(
+  list: VoiceChannelStateDto[] | undefined,
+  state: VoiceChannelStateDto,
+): VoiceChannelStateDto[] | undefined {
+  if (!list) return list;
+  const others = list.filter((s) => s.channelId !== state.channelId);
+  return state.participants.length > 0 ? [...others, state] : others;
+}
 
 export type PresenceMap = Record<string, boolean>;
 

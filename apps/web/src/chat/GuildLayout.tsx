@@ -6,6 +6,8 @@ import { type GuildContext, useGuildContext } from './guildContext';
 import { useDeleteGuild, useGuild } from './hooks';
 import { InviteModal } from './InviteModal';
 import { useLeaveGuild } from './socialHooks';
+import { VoiceChannelList } from '../voice/VoiceChannelList';
+import { VoicePanel } from '../voice/VoicePanel';
 
 /** Coluna de canais de um servidor + o canal aberto. */
 export function GuildLayout() {
@@ -93,17 +95,30 @@ export function GuildLayout() {
             </button>
           )}
         </div>
-        <nav aria-label="Canais">
-          <ul>
-            {data.channels.map((channel) => (
-              <li key={channel.id}>
-                <NavLink to={`/channels/${data.id}/${channel.id}`} className="channel-link">
-                  <span aria-hidden="true">#</span> {channel.name}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
+        <div className="channel-bar__scroll">
+          <nav aria-label="Canais">
+            <ul>
+              {data.channels
+                .filter((channel) => channel.type === 'TEXT')
+                .map((channel) => (
+                  <li key={channel.id}>
+                    <NavLink to={`/channels/${data.id}/${channel.id}`} className="channel-link">
+                      <span aria-hidden="true">#</span> {channel.name}
+                    </NavLink>
+                  </li>
+                ))}
+            </ul>
+          </nav>
+
+          {data.channels.some((c) => c.type === 'VOICE') && (
+            <div className="channel-bar__section">
+              <span>Canais de voz</span>
+            </div>
+          )}
+          <VoiceChannelList guild={data} isOwner={isOwner} />
+        </div>
+
+        <VoicePanel />
       </aside>
 
       <Outlet context={{ guild: data, isOwner } satisfies GuildContext} />
@@ -118,9 +133,9 @@ export function GuildLayout() {
   );
 }
 
-/** /channels/:guildId → primeiro canal do servidor. */
+/** /channels/:guildId → primeiro canal de texto do servidor. */
 export function GuildIndex() {
   const { guild } = useGuildContext();
-  const first = guild.channels[0];
+  const first = guild.channels.find((c) => c.type === 'TEXT');
   return first ? <Navigate to={`/channels/${guild.id}/${first.id}`} replace /> : null;
 }

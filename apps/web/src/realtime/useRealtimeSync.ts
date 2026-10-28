@@ -4,6 +4,7 @@ import type {
   GuildWithChannelsDto,
   MemberDto,
   ServerToClientEvents,
+  VoiceChannelStateDto,
 } from '@discord-2/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
@@ -20,6 +21,7 @@ import {
   upsertDm,
   upsertMember,
   upsertMessage,
+  upsertVoiceState,
 } from '../chat/cache';
 import { markGuildDeleted } from '../chat/hooks';
 import { disconnectSocket, getSocket } from './socket';
@@ -103,6 +105,10 @@ export function useRealtimeSync(): void {
       'dm:created': (dm) =>
         queryClient.setQueryData<DmChannelDto[]>(queryKeys.dms, (list) =>
           list?.some((d) => d.id === dm.id) ? list : upsertDm(list, dm),
+        ),
+      'voice:state': ({ guildId, ...state }) =>
+        queryClient.setQueryData<VoiceChannelStateDto[]>(queryKeys.voiceStates(guildId), (list) =>
+          upsertVoiceState(list, state),
         ),
     };
 

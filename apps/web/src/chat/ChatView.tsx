@@ -12,9 +12,9 @@ export function ChatView() {
   const navigate = useNavigate();
   const deleteChannel = useDeleteChannel(guild.id);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const channel = guild.channels.find((c) => c.id === channelId);
+  const channel = guild.channels.find((c) => c.id === channelId && c.type === 'TEXT');
 
-  // Canal apagado (por outra pessoa ou em outra aba): volta para o primeiro canal.
+  // Canal apagado (por outra pessoa ou em outra aba) ou de voz: volta para o primeiro de texto.
   if (!channel) return <Navigate to={`/channels/${guild.id}`} replace />;
 
   const label = `#${channel.name}`;
