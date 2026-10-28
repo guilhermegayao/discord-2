@@ -1,18 +1,9 @@
-import {
-  type ClientToServerEvents,
-  guildWithChannelsSchema,
-  type ServerToClientEvents,
-} from '@discord-2/shared';
+import { guildWithChannelsSchema } from '@discord-2/shared';
 import type { INestApplication } from '@nestjs/common';
-import type { Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
-import { io, type Socket } from 'socket.io-client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 import { createTestApp, http, resetDatabase, signUp, type TestUser } from './helpers.js';
-
-type ClientSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
-type EventName = keyof ServerToClientEvents;
+import { connected, expectNothing, next, socketTestKit } from './socket-helpers.js';
 
 /**
  * Tempo real ponta a ponta: o app escuta numa porta de verdade e os testes
@@ -20,65 +11,19 @@ type EventName = keyof ServerToClientEvents;
  */
 describe.runIf(process.env.DB_TESTS === '1')('Tempo real (Socket.IO + Postgres real)', () => {
   let app: INestApplication;
-  let url: string;
-  const sockets: ClientSocket[] = [];
+  let kit: Awaited<ReturnType<typeof socketTestKit>>;
+  const connect = (token?: string) => kit.connect(token);
 
   beforeEach(async () => {
     app = await createTestApp();
     await resetDatabase(app);
-    await app.listen(0);
-    const { port } = (app.getHttpServer() as Server).address() as AddressInfo;
-    url = `http://localhost:${port}`;
+    kit = await socketTestKit(app);
   });
 
   afterEach(async () => {
-    sockets.splice(0).forEach((s) => s.disconnect());
+    kit.closeAll();
     await app.close();
   });
-
-  function connect(token?: string): ClientSocket {
-    const socket: ClientSocket = io(url, {
-      path: '/api/socket.io',
-      auth: token ? { token } : {},
-      transports: ['websocket'],
-      reconnection: false,
-      forceNew: true,
-    });
-    sockets.push(socket);
-    return socket;
-  }
-
-  function connected(socket: ClientSocket): Promise<void> {
-    return new Promise((resolve, reject) => {
-      socket.once('connect', () => resolve());
-      socket.once('connect_error', reject);
-    });
-  }
-
-  /** Espera um evento (ou falha depois de um tempo). */
-  function next<E extends EventName>(
-    socket: ClientSocket,
-    event: E,
-    timeoutMs = 2000,
-  ): Promise<Parameters<ServerToClientEvents[E]>[0]> {
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`não chegou ${event}`)), timeoutMs);
-      const listener = (payload: Parameters<ServerToClientEvents[E]>[0]) => {
-        clearTimeout(timer);
-        resolve(payload);
-      };
-      // O socket.io-client tipa o listener por evento; aqui o evento é genérico.
-      socket.once(event, listener as never);
-    });
-  }
-
-  /** Garante que um evento NÃO chega dentro de uma janela de tempo. */
-  async function expectNothing(socket: ClientSocket, event: EventName, windowMs = 300) {
-    let received = false;
-    socket.once(event, () => (received = true));
-    await new Promise((r) => setTimeout(r, windowMs));
-    expect(received).toBe(false);
-  }
 
   async function createGuild(user: TestUser, name = 'Os Amigos') {
     const res = await http(app)
