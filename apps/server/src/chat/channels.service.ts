@@ -21,7 +21,12 @@ export class ChannelsService {
       _max: { position: true },
     });
     const channel = await this.prisma.channel.create({
-      data: { guildId, name: data.name, position: (last._max.position ?? -1) + 1 },
+      data: {
+        guildId,
+        name: data.name,
+        type: data.type,
+        position: (last._max.position ?? -1) + 1,
+      },
     });
 
     const dto = toChannelDto(channel);
@@ -47,10 +52,14 @@ export class ChannelsService {
     const { channel } = await this.access.requireGuildChannel(channelId, userId);
     await this.access.requireOwner(channel.guildId, userId);
 
-    // Todo servidor mantém pelo menos um canal: a interface sempre tem para onde ir.
-    const count = await this.prisma.channel.count({ where: { guildId: channel.guildId } });
-    if (count <= 1) {
-      throw new ConflictException('O servidor precisa ter pelo menos um canal');
+    // Todo servidor mantém pelo menos um canal de texto: a interface sempre tem para onde ir.
+    if (channel.type === 'TEXT') {
+      const textChannels = await this.prisma.channel.count({
+        where: { guildId: channel.guildId, type: 'TEXT' },
+      });
+      if (textChannels <= 1) {
+        throw new ConflictException('O servidor precisa ter pelo menos um canal de texto');
+      }
     }
 
     await this.prisma.channel.delete({ where: { id: channelId } });

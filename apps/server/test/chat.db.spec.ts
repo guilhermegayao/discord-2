@@ -207,7 +207,7 @@ describe.runIf(process.env.DB_TESTS === '1')('Chat (Postgres real)', () => {
         .expect(404);
     });
 
-    it('não deixa apagar o último canal', async () => {
+    it('não deixa apagar o último canal de texto', async () => {
       const guild = await createGuild();
 
       const res = await http(app)
@@ -216,7 +216,7 @@ describe.runIf(process.env.DB_TESTS === '1')('Chat (Postgres real)', () => {
         .expect(409);
 
       expect(apiErrorSchema.parse(res.body).message).toBe(
-        'O servidor precisa ter pelo menos um canal',
+        'O servidor precisa ter pelo menos um canal de texto',
       );
     });
   });

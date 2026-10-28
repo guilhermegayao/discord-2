@@ -86,6 +86,7 @@ model Member {
 
 enum ChannelType {
   TEXT
+  VOICE
   DM
 }
 

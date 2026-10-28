@@ -35,9 +35,9 @@ export function toGuildWithChannelsDto(
   return { ...toGuildDto(guild), channels: guild.channels.map(toChannelDto) };
 }
 
-/** Canal de servidor. DMs têm o próprio formato (toDmChannelDto). */
+/** Canal de servidor (texto ou voz). DMs têm o próprio formato (toDmChannelDto). */
 export function toChannelDto(channel: Channel): ChannelDto {
-  if (channel.type !== 'TEXT' || !channel.guildId) {
+  if (channel.type === 'DM' || !channel.guildId) {
     throw new Error(`Canal ${channel.id} não é um canal de servidor`);
   }
   return {

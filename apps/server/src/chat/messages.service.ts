@@ -1,4 +1,9 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type {
   CreateMessageData,
   MessageDto,
@@ -29,7 +34,7 @@ export class MessagesService {
    * Buscamos N+1 para saber se ainda há mais páginas sem um COUNT extra.
    */
   async list(channelId: string, userId: string, query: MessagePageQuery): Promise<MessagePageDto> {
-    await this.access.requireChannel(channelId, userId);
+    await this.requireMessageChannel(channelId, userId);
 
     const rows = await this.prisma.message.findMany({
       where: { channelId, ...(query.before && { id: { lt: query.before } }) },
@@ -46,7 +51,7 @@ export class MessagesService {
   }
 
   async create(channelId: string, userId: string, data: CreateMessageData): Promise<MessageDto> {
-    const access = await this.access.requireChannel(channelId, userId);
+    const access = await this.requireMessageChannel(channelId, userId);
 
     const message = await this.prisma.message.create({
       data: { channelId, authorId: userId, content: data.content },
@@ -92,6 +97,15 @@ export class MessagesService {
       id: messageId,
       channelId: message.channelId,
     });
+  }
+
+  /** Canal de texto ou DM. Canal de voz não tem mensagens. */
+  private async requireMessageChannel(channelId: string, userId: string): Promise<ChannelAccess> {
+    const access = await this.access.requireChannel(channelId, userId);
+    if (access.channel.type === 'VOICE') {
+      throw new BadRequestException('Canais de voz não têm mensagens');
+    }
+    return access;
   }
 
   private async findAccessible(messageId: string, userId: string) {

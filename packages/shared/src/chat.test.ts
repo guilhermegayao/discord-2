@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   channelNameSchema,
+  createChannelSchema,
   createMessageSchema,
   guildNameSchema,
   messagePageQuerySchema,
@@ -24,6 +25,17 @@ describe('channelNameSchema', () => {
   ])('rejeita %j', (input, message) => {
     const result = channelNameSchema.safeParse(input);
     expect(result.error?.issues[0]?.message).toBe(message);
+  });
+});
+
+describe('createChannelSchema', () => {
+  it('é de texto por padrão e aceita voz', () => {
+    expect(createChannelSchema.parse({ name: 'geral' }).type).toBe('TEXT');
+    expect(createChannelSchema.parse({ name: 'papo', type: 'VOICE' }).type).toBe('VOICE');
+  });
+
+  it('não deixa criar DM pelo endpoint de canal', () => {
+    expect(createChannelSchema.safeParse({ name: 'x', type: 'DM' }).success).toBe(false);
   });
 });
 

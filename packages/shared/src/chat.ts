@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { VoiceStateEvent } from './voice.js';
 
 // ---------- Entradas (validadas no servidor e nos formulários) ----------
 
@@ -35,11 +36,20 @@ export type CreateGuildData = z.output<typeof createGuildSchema>;
 export const updateGuildSchema = createGuildSchema;
 export type UpdateGuildData = z.output<typeof updateGuildSchema>;
 
-export const createChannelSchema = z.object({ name: channelNameSchema });
+/** Tipos de canal que um servidor pode ter (DM é outro conceito, sem servidor). */
+export const GUILD_CHANNEL_TYPES = ['TEXT', 'VOICE'] as const;
+export const guildChannelTypeSchema = z.enum(GUILD_CHANNEL_TYPES);
+export type GuildChannelType = z.infer<typeof guildChannelTypeSchema>;
+
+export const createChannelSchema = z.object({
+  name: channelNameSchema,
+  type: guildChannelTypeSchema.default('TEXT'),
+});
 export type CreateChannelInput = z.input<typeof createChannelSchema>;
 export type CreateChannelData = z.output<typeof createChannelSchema>;
 
-export const updateChannelSchema = createChannelSchema;
+/** Renomear não muda o tipo do canal. */
+export const updateChannelSchema = z.object({ name: channelNameSchema });
 export type UpdateChannelData = z.output<typeof updateChannelSchema>;
 
 export const createMessageSchema = z.object({
@@ -70,7 +80,7 @@ export const channelSchema = z.object({
   id: z.string(),
   guildId: z.string(),
   name: z.string(),
-  type: z.enum(['TEXT']),
+  type: guildChannelTypeSchema,
   position: z.number().int(),
   createdAt: z.iso.datetime(),
 });
@@ -239,6 +249,8 @@ export interface ServerToClientEvents {
   'presence:update': (event: PresenceEvent) => void;
   typing: (event: TypingEvent) => void;
   'dm:created': (dm: DmChannelDto) => void;
+  /** Lista completa de quem está num canal de voz, sempre que alguém entra ou sai. */
+  'voice:state': (event: VoiceStateEvent) => void;
 }
 
 export const typingStartSchema = z.object({ channelId: z.uuid() });
