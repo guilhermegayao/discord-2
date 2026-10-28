@@ -9,25 +9,30 @@ export interface CapturerSourceLike {
 }
 
 /**
- * Monta a lista do seletor: telas primeiro, depois janelas. Tira a própria
- * janela do app (compartilhá-la dá o efeito "espelho infinito") e janelas
- * sem imagem (minimizadas/invisíveis).
+ * Monta a lista do seletor: telas primeiro, depois janelas com prévia e por
+ * último as sem prévia. Tira a própria janela do app (compartilhá-la dá o
+ * efeito "espelho infinito") e janelas sem nome.
+ *
+ * Janelas sem prévia continuam na lista: o Windows não gera miniatura de
+ * janela minimizada nem de muitos jogos em tela cheia, e são justamente
+ * eles que a gente quer compartilhar.
  */
 export function toPickerSources(
   sources: CapturerSourceLike[],
   ownWindowSourceId: string | null,
 ): PickerSource[] {
+  const rank = (s: PickerSource) => (s.kind === 'screen' ? 0 : s.thumbnail ? 1 : 2);
   return sources
     .filter((s) => s.id !== ownWindowSourceId)
-    .filter((s) => s.id.startsWith('screen:') || !s.thumbnail.isEmpty())
+    .filter((s) => s.name.trim() !== '')
     .map((s) => ({
       id: s.id,
       name: s.name,
       kind: s.id.startsWith('screen:') ? ('screen' as const) : ('window' as const),
-      thumbnail: s.thumbnail.toDataURL(),
+      thumbnail: s.thumbnail.isEmpty() ? null : s.thumbnail.toDataURL(),
       appIcon: s.appIcon && !s.appIcon.isEmpty() ? s.appIcon.toDataURL() : null,
     }))
-    .sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'screen' ? -1 : 1));
+    .sort((a, b) => rank(a) - rank(b));
 }
 
 interface Pending {

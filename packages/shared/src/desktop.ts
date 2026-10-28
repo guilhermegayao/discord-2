@@ -10,8 +10,11 @@ export interface PickerSource {
   id: string;
   name: string;
   kind: 'screen' | 'window';
-  /** Miniatura em data URL (PNG). */
-  thumbnail: string;
+  /**
+   * Miniatura em data URL (PNG), ou null quando o Windows não dá prévia
+   * (janela minimizada, muitos jogos em tela cheia). Mesmo assim dá para compartilhar.
+   */
+  thumbnail: string | null;
   /** Ícone do programa da janela, quando houver. */
   appIcon: string | null;
 }

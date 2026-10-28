@@ -15,13 +15,13 @@ function source(
 }
 
 describe('toPickerSources', () => {
-  it('telas primeiro, sem a própria janela do app e sem janelas invisíveis', () => {
+  it('telas primeiro, sem a própria janela do app e sem janelas sem nome', () => {
     const result = toPickerSources(
       [
         source('window:1:0', 'Jogo', 'thumb-jogo', 'icone-jogo'),
         source('window:2:0', 'discord-2'),
         source('screen:0:0', 'Tela 1'),
-        source('window:3:0', 'Minimizada', null),
+        source('window:4:0', '  '),
       ],
       'window:2:0',
     );
@@ -31,6 +31,20 @@ describe('toPickerSources', () => {
       ['window', 'Jogo'],
     ]);
     expect(result[1]).toMatchObject({ thumbnail: 'thumb-jogo', appIcon: 'icone-jogo' });
+  });
+
+  it('mantém janelas sem prévia (jogo minimizado ou em tela cheia), no fim da lista', () => {
+    const result = toPickerSources(
+      [
+        source('window:3:0', 'Jogo em tela cheia', null, 'icone-jogo'),
+        source('window:1:0', 'Bloco de Notas'),
+        source('screen:0:0', 'Tela 1'),
+      ],
+      null,
+    );
+
+    expect(result.map((s) => s.name)).toEqual(['Tela 1', 'Bloco de Notas', 'Jogo em tela cheia']);
+    expect(result[2]).toMatchObject({ thumbnail: null, appIcon: 'icone-jogo' });
   });
 });
 

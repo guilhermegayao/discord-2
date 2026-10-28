@@ -107,7 +107,15 @@ function SourceOption({
         onClick={onSelect}
         onDoubleClick={onConfirm}
       >
-        <img src={source.thumbnail} alt="" className="picker__thumb" />
+        {source.thumbnail ? (
+          <img src={source.thumbnail} alt="" className="picker__thumb" />
+        ) : (
+          // Janela minimizada ou jogo em tela cheia: o Windows não dá prévia, mas captura.
+          <span className="picker__thumb picker__thumb--empty">
+            Sem prévia
+            <small>minimizada ou em tela cheia</small>
+          </span>
+        )}
         <span className="picker__name">
           {source.appIcon && <img src={source.appIcon} alt="" className="picker__icon" />}
           {source.name}

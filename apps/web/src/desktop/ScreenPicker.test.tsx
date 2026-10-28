@@ -109,6 +109,32 @@ describe('<ScreenPicker /> (app desktop)', () => {
     expect(bridge.respondScreenPicker).toHaveBeenNthCalledWith(2, 'pick-2', null);
   });
 
+  it('janela sem prévia (jogo em tela cheia) aparece e pode ser compartilhada', async () => {
+    const user = userEvent.setup();
+    const { bridge, open } = installBridge();
+    render(<ScreenPicker />);
+    open({
+      requestId: 'pick-3',
+      sources: [
+        {
+          id: 'window:9:0',
+          name: 'Jogo em tela cheia',
+          kind: 'window',
+          thumbnail: null,
+          appIcon: null,
+        },
+      ],
+    });
+
+    // Sem telas na lista, o seletor já abre na aba de janelas.
+    const option = screen.getByRole('button', { name: /Jogo em tela cheia/ });
+    expect(within(option).getByText('Sem prévia')).toBeInTheDocument();
+    await user.click(option);
+    await user.click(screen.getByRole('button', { name: 'Compartilhar' }));
+
+    expect(bridge.respondScreenPicker).toHaveBeenCalledWith('pick-3', 'window:9:0');
+  });
+
   it('avisa que o áudio do sistema ainda não vai junto no app', () => {
     const { open } = installBridge();
     render(<ScreenPicker />);

@@ -910,6 +910,19 @@ textarea:focus-visible {
   background: #000;
 }
 
+.picker__thumb--empty {
+  display: grid;
+  place-content: center;
+  gap: 2px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.picker__thumb--empty small {
+  font-size: 0.7rem;
+}
+
 .picker__name {
   display: flex;
   align-items: center;
