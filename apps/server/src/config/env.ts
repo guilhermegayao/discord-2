@@ -13,6 +13,10 @@ const envSchema = z.object({
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
   /** true em produção (HTTPS). Em dev, http://localhost não aceita cookie Secure em todos os navegadores. */
   COOKIE_SECURE: z.stringbool().default(false),
+
+  // --- Tempo real ---
+  /** Quanto tempo esperar sem nenhuma aba conectada antes de marcar offline (evita "piscar" no F5). */
+  PRESENCE_GRACE_MS: z.coerce.number().int().nonnegative().default(5000),
 });
 
 export type Env = z.infer<typeof envSchema>;

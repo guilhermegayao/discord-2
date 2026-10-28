@@ -24,6 +24,8 @@ export default defineConfig({
       NODE_ENV: 'test',
       DATABASE_URL: testUrl.toString(),
       JWT_ACCESS_SECRET: 'segredo-de-teste-com-pelo-menos-32-caracteres',
+      // Prazo curto para o offline nos testes de presença (padrão: 5 s)
+      PRESENCE_GRACE_MS: '200',
     },
   },
 });

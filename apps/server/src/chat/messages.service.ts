@@ -6,13 +6,14 @@ import type {
   MessagePageQuery,
   UpdateMessageData,
 } from '@discord-2/shared';
+import { type ChannelAccess, ChatAccessService } from '../access/chat-access.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
-import { ChatAccessService } from './chat-access.service.js';
 import { messageAuthorSelect, toMessageDto } from './chat.mappers.js';
 
 const withAuthor = { author: { select: messageAuthorSelect } } as const;
 
+/** Mensagens de canais de servidor e de DMs (as regras de acesso mudam, o resto é igual). */
 @Injectable()
 export class MessagesService {
   constructor(
@@ -45,7 +46,7 @@ export class MessagesService {
   }
 
   async create(channelId: string, userId: string, data: CreateMessageData): Promise<MessageDto> {
-    const { channel } = await this.access.requireChannel(channelId, userId);
+    const access = await this.access.requireChannel(channelId, userId);
 
     const message = await this.prisma.message.create({
       data: { channelId, authorId: userId, content: data.content },
@@ -54,12 +55,12 @@ export class MessagesService {
 
     // Emitido só depois de salvo: quem recebe o evento pode confiar que a mensagem existe.
     const dto = toMessageDto(message, data.nonce);
-    this.realtime.emitToGuild(channel.guildId, 'message:created', dto);
+    this.realtime.emitToAudience(ChatAccessService.audience(access), 'message:created', dto);
     return dto;
   }
 
   async update(messageId: string, userId: string, data: UpdateMessageData): Promise<MessageDto> {
-    const { message, guildId } = await this.findAccessible(messageId, userId);
+    const { message, access } = await this.findAccessible(messageId, userId);
     if (message.authorId !== userId) {
       throw new ForbiddenException('Só quem escreveu pode editar a mensagem');
     }
@@ -71,19 +72,23 @@ export class MessagesService {
     });
 
     const dto = toMessageDto(updated);
-    this.realtime.emitToGuild(guildId, 'message:updated', dto);
+    this.realtime.emitToAudience(ChatAccessService.audience(access), 'message:updated', dto);
     return dto;
   }
 
-  /** O autor apaga a própria mensagem; o dono do servidor apaga qualquer uma. */
+  /**
+   * O autor apaga a própria mensagem; num servidor, o dono apaga qualquer uma.
+   * Em DM, só o autor.
+   */
   async remove(messageId: string, userId: string): Promise<void> {
-    const { message, guildId, role } = await this.findAccessible(messageId, userId);
-    if (message.authorId !== userId && role !== 'OWNER') {
+    const { message, access } = await this.findAccessible(messageId, userId);
+    const isGuildOwner = access.kind === 'guild' && access.role === 'OWNER';
+    if (message.authorId !== userId && !isGuildOwner) {
       throw new ForbiddenException('Você não pode apagar esta mensagem');
     }
 
     await this.prisma.message.delete({ where: { id: messageId } });
-    this.realtime.emitToGuild(guildId, 'message:deleted', {
+    this.realtime.emitToAudience(ChatAccessService.audience(access), 'message:deleted', {
       id: messageId,
       channelId: message.channelId,
     });
@@ -93,12 +98,13 @@ export class MessagesService {
     const message = await this.prisma.message.findUnique({ where: { id: messageId } });
     if (!message) throw new NotFoundException('Mensagem não encontrada');
 
+    let access: ChannelAccess;
     try {
-      const { channel, role } = await this.access.requireChannel(message.channelId, userId);
-      return { message, guildId: channel.guildId, role };
+      access = await this.access.requireChannel(message.channelId, userId);
     } catch {
-      // Não membro: mesma resposta de "não existe".
+      // Sem acesso: mesma resposta de "não existe".
       throw new NotFoundException('Mensagem não encontrada');
     }
+    return { message, access };
   }
 }

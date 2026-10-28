@@ -2,7 +2,7 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import type { ChannelDto, CreateChannelData, UpdateChannelData } from '@discord-2/shared';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
-import { ChatAccessService } from './chat-access.service.js';
+import { ChatAccessService } from '../access/chat-access.service.js';
 import { toChannelDto } from './chat.mappers.js';
 
 @Injectable()
@@ -30,7 +30,7 @@ export class ChannelsService {
   }
 
   async update(channelId: string, userId: string, data: UpdateChannelData): Promise<ChannelDto> {
-    const { channel } = await this.access.requireChannel(channelId, userId);
+    const { channel } = await this.access.requireGuildChannel(channelId, userId);
     await this.access.requireOwner(channel.guildId, userId);
 
     const updated = await this.prisma.channel.update({
@@ -44,7 +44,7 @@ export class ChannelsService {
   }
 
   async remove(channelId: string, userId: string): Promise<void> {
-    const { channel } = await this.access.requireChannel(channelId, userId);
+    const { channel } = await this.access.requireGuildChannel(channelId, userId);
     await this.access.requireOwner(channel.guildId, userId);
 
     // Todo servidor mantém pelo menos um canal: a interface sempre tem para onde ir.

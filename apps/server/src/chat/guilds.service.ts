@@ -7,7 +7,7 @@ import type {
 } from '@discord-2/shared';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
-import { ChatAccessService } from './chat-access.service.js';
+import { ChatAccessService } from '../access/chat-access.service.js';
 import { toGuildDto, toGuildWithChannelsDto } from './chat.mappers.js';
 
 const channelsInOrder = { channels: { orderBy: { position: 'asc' } } } as const;
