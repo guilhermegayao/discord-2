@@ -17,6 +17,9 @@ function renderApp(path = '/') {
 const loggedIn = () =>
   server.use(http.post('/api/auth/refresh', () => HttpResponse.json(authResponse())));
 
+/** Logado e sem servidores, o app mostra o estado vazio de /channels. */
+const LOGGED_IN_HOME = 'Você ainda não está em nenhum servidor';
+
 describe('rotas protegidas e sessão', () => {
   it('sem sessão, a home redireciona para o login', async () => {
     renderApp('/');
@@ -31,7 +34,7 @@ describe('rotas protegidas e sessão', () => {
 
     renderApp('/');
 
-    expect(await screen.findByRole('heading', { name: 'Olá, Guilherme!' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: LOGGED_IN_HOME })).toBeInTheDocument();
   });
 
   it('quem já está logado e abre /login vai para a home', async () => {
@@ -39,7 +42,7 @@ describe('rotas protegidas e sessão', () => {
 
     renderApp('/login');
 
-    expect(await screen.findByRole('heading', { name: 'Olá, Guilherme!' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: LOGGED_IN_HOME })).toBeInTheDocument();
   });
 });
 
@@ -59,7 +62,7 @@ describe('login', () => {
     await user.type(screen.getByLabelText('Senha'), 'senha-forte-123');
     await user.click(screen.getByRole('button', { name: 'Entrar' }));
 
-    expect(await screen.findByRole('heading', { name: 'Olá, Guilherme!' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: LOGGED_IN_HOME })).toBeInTheDocument();
     // O schema do shared normalizou o e-mail antes de enviar
     expect(sentBody).toEqual({ email: 'gui@example.com', password: 'senha-forte-123' });
   });
@@ -74,7 +77,7 @@ describe('login', () => {
     await user.click(screen.getByRole('button', { name: 'Entrar' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('E-mail ou senha incorretos');
-    expect(screen.queryByRole('heading', { name: /Olá/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: LOGGED_IN_HOME })).not.toBeInTheDocument();
   });
 });
 
