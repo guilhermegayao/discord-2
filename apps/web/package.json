@@ -28,9 +28,11 @@
   "dependencies": {
     "@discord-2/shared": "^0.0.0",
     "@hookform/resolvers": "^6.0.1",
+    "@tanstack/react-query": "^5.105.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-hook-form": "^7.91.0",
-    "react-router": "^8.5.0"
+    "react-router": "^8.5.0",
+    "socket.io-client": "^4.8.4"
   }
 }

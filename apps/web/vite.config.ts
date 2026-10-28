@@ -19,8 +19,9 @@ export default defineConfig(({ mode }) => {
       // Em dev o navegador só fala com o Vite (mesma origem), e o Vite
       // repassa /api/* para o servidor. Assim não precisamos de CORS, e o
       // cookie do refresh token (path=/api/auth) funciona igual à produção.
+      // ws: true repassa também o WebSocket do Socket.IO (/api/socket.io).
       proxy: {
-        '/api': serverUrl,
+        '/api': { target: serverUrl, ws: true },
       },
     },
     test: {

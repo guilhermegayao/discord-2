@@ -1,7 +1,9 @@
 :root {
   color-scheme: dark;
   --bg: #1e1f22;
+  --bg-chat: #313338;
   --surface: #2b2d31;
+  --hover: #393c41;
   --text: #dbdee1;
   --muted: #949ba4;
   --accent: #5865f2;
@@ -19,26 +21,79 @@
   box-sizing: border-box;
 }
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  background: var(--bg);
-  color: var(--text);
+html,
+body,
+#root {
+  height: 100%;
 }
 
-.app {
-  width: min(420px, 100% - 32px);
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
 }
 
 h1 {
   margin-bottom: 0.25rem;
 }
 
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 .muted {
   color: var(--muted);
 }
+
+/* --- Botões --- */
+
+button {
+  padding: 0.5rem 1rem;
+  border: 0;
+  border-radius: 4px;
+  background: var(--accent);
+  color: white;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.button--secondary {
+  background: transparent;
+  border: 1px solid var(--muted);
+  color: var(--text);
+}
+
+.icon-button,
+.link-button {
+  padding: 0.15rem 0.35rem;
+  background: transparent;
+  color: var(--muted);
+}
+
+.icon-button:hover,
+.link-button:hover {
+  color: var(--text);
+}
+
+.link-button {
+  padding: 0;
+  color: #00a8fc;
+  text-decoration: underline;
+}
+
+a {
+  color: #00a8fc;
+}
+
+/* --- Status (estado vazio) --- */
 
 .status {
   margin-top: 1.5rem;
@@ -56,11 +111,12 @@ h1 {
 }
 
 .status ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
   display: grid;
   gap: 0.4rem;
+}
+
+.status button {
+  margin-top: 1rem;
 }
 
 .dot {
@@ -79,37 +135,17 @@ h1 {
   background: var(--down);
 }
 
-button {
-  margin-top: 1rem;
-  padding: 0.5rem 1rem;
-  border: 0;
-  border-radius: 4px;
-  background: var(--accent);
-  color: white;
-  font: inherit;
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: wait;
-}
-
-.button--secondary {
-  margin-top: 0;
-  background: transparent;
-  border: 1px solid var(--muted);
-  color: var(--text);
-}
-
-a {
-  color: #00a8fc;
-}
-
 /* --- Login / cadastro --- */
 
 .auth {
-  width: min(420px, 100% - 32px);
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.auth > .card {
+  width: min(420px, 100%);
 }
 
 .card {
@@ -120,7 +156,8 @@ a {
   background: var(--surface);
 }
 
-.card h1 {
+.card h1,
+.card h2 {
   margin: 0;
   font-size: 1.5rem;
   text-align: center;
@@ -131,7 +168,7 @@ a {
   text-align: center;
 }
 
-.card button[type='submit'] {
+.auth .card button[type='submit'] {
   width: 100%;
 }
 
@@ -148,7 +185,8 @@ a {
   color: var(--muted);
 }
 
-.field input {
+.field input,
+textarea {
   padding: 0.6rem 0.7rem;
   border: 1px solid transparent;
   border-radius: 4px;
@@ -157,7 +195,8 @@ a {
   font: inherit;
 }
 
-.field input:focus-visible {
+.field input:focus-visible,
+textarea:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 0;
 }
@@ -176,19 +215,345 @@ a {
   margin: 0;
 }
 
-/* --- Home --- */
+/* --- Modal --- */
 
-.home__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(0 0 0 / 0.7);
+}
+
+.modal {
+  width: min(440px, 100%);
+}
+
+.modal__form {
+  display: grid;
   gap: 1rem;
 }
 
-.home__header h1 {
-  margin-bottom: 0;
+.modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
 }
 
-.home__header p {
-  margin-top: 0.25rem;
+/* --- Área logada: barra de servidores | canais | chat --- */
+
+.shell {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 72px 240px minmax(0, 1fr);
+}
+
+.guild-bar {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 12px 0;
+  background: var(--bg);
+  overflow-y: auto;
+}
+
+.guild-bar ul {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.guild-bar__item {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--bg-chat);
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    border-radius 0.15s,
+    background 0.15s;
+}
+
+.guild-bar__item:hover,
+.guild-bar__item.active {
+  border-radius: 16px;
+  background: var(--accent);
+  color: white;
+}
+
+.guild-bar__add {
+  font-size: 1.5rem;
+  color: var(--up);
+}
+
+.guild-bar__add:hover {
+  background: var(--up);
+}
+
+.guild-bar__user {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.channel-bar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+}
+
+.channel-bar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  height: 48px;
+  padding: 0 12px 0 16px;
+  border-bottom: 1px solid var(--bg);
+}
+
+.channel-bar__header h2 {
+  margin: 0;
+  font-size: 1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.channel-bar__section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 8px 4px 16px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.channel-bar nav {
+  padding: 0 8px;
+  overflow-y: auto;
+}
+
+.channel-link {
+  display: block;
+  padding: 6px 8px;
+  border-radius: 4px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.channel-link:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.channel-link.active {
+  background: #404249;
+  color: white;
+}
+
+/* --- Chat --- */
+
+.chat,
+.empty {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--bg-chat);
+}
+
+.empty {
+  grid-column: 2 / -1;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+}
+
+.empty__content {
+  width: min(460px, 100%);
+  text-align: center;
+}
+
+.empty__content .status {
+  text-align: left;
+}
+
+.chat__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  height: 48px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--bg);
+}
+
+.chat__header h1 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 0;
+}
+
+.messages--error {
+  padding: 16px;
+}
+
+.messages__older {
+  display: block;
+  margin: 0 auto 12px;
+}
+
+.messages__start {
+  padding: 0 16px 16px;
+}
+
+.messages__start h2 {
+  margin: 0 0 0.25rem;
+}
+
+.message {
+  position: relative;
+  padding: 2px 16px;
+}
+
+.message--first {
+  margin-top: 12px;
+}
+
+.message:hover {
+  background: rgb(0 0 0 / 0.08);
+}
+
+.message--pending {
+  opacity: 0.55;
+}
+
+.message--failed .message__content {
+  color: #fa777c;
+}
+
+.message__header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.message__header time {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.message__content {
+  margin: 2px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.message__edited,
+.message__failed {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.message__failed {
+  margin: 2px 0 0;
+}
+
+.message__actions {
+  position: absolute;
+  top: -8px;
+  right: 16px;
+  display: none;
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.message:hover .message__actions,
+.message:focus-within .message__actions {
+  display: flex;
+}
+
+.message__edit {
+  display: grid;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.message__edit textarea {
+  resize: vertical;
+}
+
+.message__edit span {
+  font-size: 0.75rem;
+}
+
+.composer {
+  position: relative;
+  padding: 0 16px 24px;
+}
+
+.composer textarea {
+  width: 100%;
+  max-height: 40vh;
+  padding: 11px 16px;
+  border-radius: 8px;
+  background: #383a40;
+  resize: none;
+  field-sizing: content;
+}
+
+.composer__counter {
+  position: absolute;
+  right: 28px;
+  bottom: 32px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.composer__counter--full {
+  color: var(--down);
+}
+
+/* Telas estreitas: some a coluna de canais (navegação mobile entra na Fase 8). */
+@media (width < 700px) {
+  .shell {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+
+  .channel-bar {
+    display: none;
+  }
+
+  .empty {
+    grid-column: 2;
+  }
 }

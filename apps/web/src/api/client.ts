@@ -28,6 +28,11 @@ export function setAccessToken(token: string | null): void {
   accessToken = token;
 }
 
+/** Usado pelo socket, que manda o token no handshake de cada (re)conexão. */
+export function getAccessToken(): string | null {
+  return accessToken;
+}
+
 /** Avisa quando a sessão morreu no meio do uso (refresh recusado). */
 export function onSessionExpired(listener: () => void): () => void {
   sessionExpiredListeners.add(listener);
