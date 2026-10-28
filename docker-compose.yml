@@ -18,5 +18,39 @@ services:
       timeout: 5s
       retries: 10
 
+  # Servidor de mídia (voz e, na Fase 5, tela). Toda a configuração vem do .env
+  # para o mesmo bloco poder ser levado para a VM da Fase 7.
+  livekit:
+    image: livekit/livekit-server:v1.13.10
+    restart: unless-stopped
+    environment:
+      LIVEKIT_CONFIG: |
+        port: ${LIVEKIT_PORT:-7890}
+        rtc:
+          # Uma porta UDP só (multiplexada) + TCP de reserva: mapear uma faixa
+          # grande de portas UDP no Docker Desktop do Windows é lento.
+          udp_port: ${LIVEKIT_RTC_UDP_PORT:-7892}
+          tcp_port: ${LIVEKIT_RTC_TCP_PORT:-7891}
+          use_external_ip: false
+          # IP que o LiveKit anuncia para os navegadores se conectarem.
+          node_ip: ${LIVEKIT_NODE_IP:-127.0.0.1}
+        keys:
+          ${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-segredo-de-desenvolvimento-do-livekit-troque}
+        webhook:
+          api_key: ${LIVEKIT_API_KEY:-devkey}
+          urls:
+            - ${LIVEKIT_WEBHOOK_URL:-http://host.docker.internal:3100/api/livekit/webhook}
+        logging:
+          level: info
+    ports:
+      # As portas de mídia precisam ser iguais dentro e fora do container,
+      # porque o LiveKit anuncia node_ip:porta para o navegador.
+      - '${LIVEKIT_PORT:-7890}:${LIVEKIT_PORT:-7890}'
+      - '${LIVEKIT_RTC_TCP_PORT:-7891}:${LIVEKIT_RTC_TCP_PORT:-7891}'
+      - '${LIVEKIT_RTC_UDP_PORT:-7892}:${LIVEKIT_RTC_UDP_PORT:-7892}/udp'
+    extra_hosts:
+      # Permite ao LiveKit chamar o webhook do Nest rodando no host.
+      - 'host.docker.internal:host-gateway'
+
 volumes:
   postgres-data:
