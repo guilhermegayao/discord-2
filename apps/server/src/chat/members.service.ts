@@ -3,6 +3,7 @@ import type { MemberDto } from '@discord-2/shared';
 import { ChatAccessService } from '../access/chat-access.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
+import { VoiceService } from '../voice/voice.service.js';
 import { publicUserSelect, toMemberDto } from './chat.mappers.js';
 
 @Injectable()
@@ -11,6 +12,7 @@ export class MembersService {
     private readonly prisma: PrismaService,
     private readonly access: ChatAccessService,
     private readonly realtime: RealtimeGateway,
+    private readonly voice: VoiceService,
   ) {}
 
   /** Membros com o status online/offline de agora. */
@@ -54,5 +56,7 @@ export class MembersService {
     this.realtime.removeUserFromGuild(userId, guildId);
     this.realtime.emitToUser(userId, 'guild:removed', { id: guildId });
     this.realtime.emitToGuild(guildId, 'member:left', { guildId, userId });
+    // E também da voz: sem isso, a pessoa continuaria ouvindo o canal.
+    await this.voice.disconnectFromGuild(userId, guildId);
   }
 }

@@ -26,6 +26,12 @@ export default defineConfig({
       JWT_ACCESS_SECRET: 'segredo-de-teste-com-pelo-menos-32-caracteres',
       // Prazo curto para o offline nos testes de presença (padrão: 5 s)
       PRESENCE_GRACE_MS: '200',
+      // LiveKit: os testes não precisam dele rodando (tokens e assinaturas são
+      // verificados offline; a API de salas é trocada por um dublê).
+      LIVEKIT_URL: 'ws://localhost:7890',
+      LIVEKIT_API_KEY: 'chave-de-teste',
+      LIVEKIT_API_SECRET: 'segredo-de-teste-do-livekit-com-32-caracteres',
+      LIVEKIT_SYNC_ON_START: 'false',
     },
   },
 });

@@ -3,6 +3,7 @@ import type { ChannelDto, CreateChannelData, UpdateChannelData } from '@discord-
 import { PrismaService } from '../prisma/prisma.service.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { ChatAccessService } from '../access/chat-access.service.js';
+import { VoiceService } from '../voice/voice.service.js';
 import { toChannelDto } from './chat.mappers.js';
 
 @Injectable()
@@ -11,6 +12,7 @@ export class ChannelsService {
     private readonly prisma: PrismaService,
     private readonly access: ChatAccessService,
     private readonly realtime: RealtimeGateway,
+    private readonly voice: VoiceService,
   ) {}
 
   async create(guildId: string, userId: string, data: CreateChannelData): Promise<ChannelDto> {
@@ -67,5 +69,6 @@ export class ChannelsService {
       id: channelId,
       guildId: channel.guildId,
     });
+    if (channel.type === 'VOICE') await this.voice.closeChannel(channelId);
   }
 }

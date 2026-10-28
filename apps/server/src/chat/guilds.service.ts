@@ -8,6 +8,7 @@ import type {
 import { PrismaService } from '../prisma/prisma.service.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { ChatAccessService } from '../access/chat-access.service.js';
+import { VoiceService } from '../voice/voice.service.js';
 import { toGuildDto, toGuildWithChannelsDto } from './chat.mappers.js';
 
 const channelsInOrder = { channels: { orderBy: { position: 'asc' } } } as const;
@@ -18,6 +19,7 @@ export class GuildsService {
     private readonly prisma: PrismaService,
     private readonly access: ChatAccessService,
     private readonly realtime: RealtimeGateway,
+    private readonly voice: VoiceService,
   ) {}
 
   /** Servidores de que o usuário participa, na ordem em que entrou. */
@@ -79,10 +81,15 @@ export class GuildsService {
 
   async remove(guildId: string, userId: string): Promise<void> {
     await this.access.requireOwner(guildId, userId);
+    const voiceChannels = await this.prisma.channel.findMany({
+      where: { guildId, type: 'VOICE' },
+      select: { id: true },
+    });
     // Canais, membros e mensagens vão junto (ON DELETE CASCADE).
     await this.prisma.guild.delete({ where: { id: guildId } });
 
     this.realtime.emitToGuild(guildId, 'guild:deleted', { id: guildId });
     this.realtime.closeGuild(guildId);
+    for (const { id } of voiceChannels) await this.voice.closeChannel(id);
   }
 }

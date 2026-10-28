@@ -17,6 +17,18 @@ const envSchema = z.object({
   // --- Tempo real ---
   /** Quanto tempo esperar sem nenhuma aba conectada antes de marcar offline (evita "piscar" no F5). */
   PRESENCE_GRACE_MS: z.coerce.number().int().nonnegative().default(5000),
+
+  // --- Voz (LiveKit) ---
+  /** Endereço que o navegador usa (ws:// em dev, wss:// em produção). */
+  LIVEKIT_URL: z.url({ protocol: /^wss?$/ }),
+  /** Endereço que o servidor usa para a API do LiveKit. Padrão: o LIVEKIT_URL em http(s). */
+  LIVEKIT_API_URL: z.url({ protocol: /^https?$/ }).optional(),
+  LIVEKIT_API_KEY: z.string().min(1),
+  LIVEKIT_API_SECRET: z
+    .string()
+    .min(32, { error: 'LIVEKIT_API_SECRET precisa ter pelo menos 32 caracteres' }),
+  /** Ao subir, pergunta ao LiveKit quem já está na voz (desligado nos testes). */
+  LIVEKIT_SYNC_ON_START: z.stringbool().default(true),
 });
 
 export type Env = z.infer<typeof envSchema>;
