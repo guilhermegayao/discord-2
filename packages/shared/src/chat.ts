@@ -174,6 +174,8 @@ export const dmChannelSchema = z.object({
   type: z.literal('DM'),
   /** A outra pessoa da conversa (do ponto de vista de quem pediu). */
   recipient: publicUserSchema,
+  /** Se a outra pessoa está online agora (depois, os eventos de presença atualizam). */
+  recipientOnline: z.boolean(),
   createdAt: z.iso.datetime(),
   /** Quando foi a última mensagem; null se ainda não houve nenhuma. */
   lastMessageAt: z.iso.datetime().nullable(),

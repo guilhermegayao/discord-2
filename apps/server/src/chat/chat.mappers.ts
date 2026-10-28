@@ -53,12 +53,14 @@ export function toChannelDto(channel: Channel): ChannelDto {
 export function toDmChannelDto(
   channel: Channel,
   recipient: PublicUser,
+  recipientOnline: boolean,
   lastMessage: Pick<Message, 'createdAt'> | undefined,
 ): DmChannelDto {
   return {
     id: channel.id,
     type: 'DM',
     recipient: toPublicUser(recipient),
+    recipientOnline,
     createdAt: channel.createdAt.toISOString(),
     lastMessageAt: lastMessage?.createdAt.toISOString() ?? null,
   };

@@ -87,6 +87,6 @@ export class DmsService {
   private toDto(row: DmRow, viewerId: string): DmChannelDto {
     const other = row.participants.find((p) => p.userId !== viewerId);
     if (!other) throw new Error(`DM ${row.id} sem o outro participante`);
-    return toDmChannelDto(row, other.user, row.messages[0]);
+    return toDmChannelDto(row, other.user, this.realtime.isOnline(other.userId), row.messages[0]);
   }
 }
