@@ -23,6 +23,8 @@ model User {
   ownedGuilds  Guild[]
   memberships  Member[]
   messages     Message[]
+  dmChannels   ChannelParticipant[]
+  invites      Invite[]
 
   @@map("users")
 }
@@ -57,6 +59,7 @@ model Guild {
   createdAt DateTime  @default(now()) @map("created_at")
   members   Member[]
   channels  Channel[]
+  invites   Invite[]
 
   @@index([ownerId])
   @@map("guilds")
@@ -83,20 +86,56 @@ model Member {
 
 enum ChannelType {
   TEXT
+  DM
 }
 
+/// Canal de texto de um servidor (TEXT) ou conversa direta entre duas pessoas (DM).
+/// Uma DM não tem servidor: quem pode ver são os participantes.
 model Channel {
-  id        String      @id @default(uuid(7)) @db.Uuid
-  guildId   String      @map("guild_id") @db.Uuid
-  guild     Guild       @relation(fields: [guildId], references: [id], onDelete: Cascade)
-  name      String
-  type      ChannelType @default(TEXT)
-  position  Int
-  createdAt DateTime    @default(now()) @map("created_at")
-  messages  Message[]
+  id           String               @id @default(uuid(7)) @db.Uuid
+  guildId      String?              @map("guild_id") @db.Uuid
+  guild        Guild?               @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  name         String               @default("")
+  type         ChannelType          @default(TEXT)
+  position     Int                  @default(0)
+  /// Só em DMs: os dois ids de usuário em ordem, "a:b". O índice único
+  /// garante uma única DM entre as mesmas duas pessoas.
+  dmKey        String?              @unique @map("dm_key")
+  createdAt    DateTime             @default(now()) @map("created_at")
+  messages     Message[]
+  participants ChannelParticipant[]
 
   @@index([guildId, position])
   @@map("channels")
+}
+
+/// Quem participa de uma DM.
+model ChannelParticipant {
+  channelId String  @map("channel_id") @db.Uuid
+  channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  userId    String  @map("user_id") @db.Uuid
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([channelId, userId])
+  /// "Minhas DMs" consulta por usuário
+  @@index([userId])
+  @@map("channel_participants")
+}
+
+model Invite {
+  /// Código curto e aleatório que vai no link (/invite/<code>)
+  code      String    @id
+  guildId   String    @map("guild_id") @db.Uuid
+  guild     Guild     @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  creatorId String    @map("creator_id") @db.Uuid
+  creator   User      @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  uses      Int       @default(0)
+  /// null = não expira
+  expiresAt DateTime? @map("expires_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([guildId])
+  @@map("invites")
 }
 
 model Message {
