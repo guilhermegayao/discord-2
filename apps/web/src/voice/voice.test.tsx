@@ -73,7 +73,9 @@ describe('lista de canais de voz', () => {
     withVoiceGuild();
     server.use(
       http.get('/api/guilds/g-1/voice-states', () =>
-        HttpResponse.json([{ channelId: 'v-1', participants: [otherUser] }]),
+        HttpResponse.json([
+          { channelId: 'v-1', participants: [{ ...otherUser, streaming: false }] },
+        ]),
       ),
     );
     renderApp();
@@ -83,9 +85,15 @@ describe('lista de canais de voz', () => {
     fakeSocket.serverEmit('voice:state', {
       guildId: 'g-1',
       channelId: 'v-1',
-      participants: [otherUser, { ...otherUser, id: 'u-3', displayName: 'Bia' }],
+      participants: [
+        { ...otherUser, streaming: false },
+        { ...otherUser, id: 'u-3', displayName: 'Bia', streaming: true },
+      ],
     });
-    expect(await within(await peopleIn('papo')).findByText('Bia')).toBeInTheDocument();
+    const people = await peopleIn('papo');
+    const bia = await within(people).findByText('Bia');
+    // Quem está fora da voz também vê quem está transmitindo.
+    expect(within(bia.closest('li')!).getByText('AO VIVO')).toBeInTheDocument();
 
     fakeSocket.serverEmit('voice:state', { guildId: 'g-1', channelId: 'v-1', participants: [] });
     await waitFor(() =>
@@ -111,7 +119,9 @@ describe('entrar e sair da voz', () => {
     await joinPapo();
 
     const room = lastRoom();
-    expect(room.connect).toHaveBeenCalledWith('ws://livekit.test', 'token-v-1');
+    expect(room.connect).toHaveBeenCalledWith('ws://livekit.test', 'token-v-1', {
+      autoSubscribe: false,
+    });
     expect(room.localParticipant.setMicrophoneEnabled).toHaveBeenCalledWith(true);
     expect(within(await peopleIn('papo')).getByText('Guilherme')).toBeInTheDocument();
   });
@@ -193,7 +203,9 @@ describe('entrar e sair da voz', () => {
 
     expect(first.disconnect).toHaveBeenCalled();
     expect(lastRoom()).not.toBe(first);
-    expect(lastRoom().connect).toHaveBeenCalledWith('ws://livekit.test', 'token-v-2');
+    expect(lastRoom().connect).toHaveBeenCalledWith('ws://livekit.test', 'token-v-2', {
+      autoSubscribe: false,
+    });
   });
 });
 
