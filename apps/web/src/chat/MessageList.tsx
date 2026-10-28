@@ -1,4 +1,3 @@
-import type { ChannelDto } from '@discord-2/shared';
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import type { ChatMessage } from './cache';
@@ -22,18 +21,22 @@ function startsGroup(prev: ChatMessage | undefined, current: ChatMessage): boole
 }
 
 interface Props {
-  channel: ChannelDto;
-  /** Dono do servidor pode apagar qualquer mensagem. */
+  channelId: string;
+  /** "#geral" ou "@ana". */
+  label: string;
+  /** Texto do começo da conversa ("Boas-vindas a #geral!"). */
+  welcome: string;
+  /** Dono do servidor pode apagar qualquer mensagem (em DM, ninguém modera). */
   canModerate: boolean;
 }
 
-export function MessageList({ channel, canModerate }: Props) {
+export function MessageList({ channelId, label, welcome, canModerate }: Props) {
   const { user } = useAuth();
-  const query = useMessages(channel.id);
-  const edit = useEditMessage(channel.id);
-  const remove = useDeleteMessage(channel.id);
-  const send = useSendMessage(channel.id);
-  const discard = useDiscardMessage(channel.id);
+  const query = useMessages(channelId);
+  const edit = useEditMessage(channelId);
+  const remove = useDeleteMessage(channelId);
+  const send = useSendMessage(channelId);
+  const discard = useDiscardMessage(channelId);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   /** Altura/posição antes de carregar mensagens antigas (para não "pular" a tela). */
@@ -99,12 +102,12 @@ export function MessageList({ channel, canModerate }: Props) {
         </button>
       ) : (
         <div className="messages__start">
-          <h2>Boas-vindas a #{channel.name}!</h2>
+          <h2>{welcome}</h2>
           <p className="muted">Este é o começo do canal.</p>
         </div>
       )}
 
-      <ol className="messages__list" aria-label={`Mensagens em #${channel.name}`}>
+      <ol className="messages__list" aria-label={`Mensagens em ${label}`}>
         {messages.map((message, i) => {
           const mine = message.author.id === user?.id;
           return (

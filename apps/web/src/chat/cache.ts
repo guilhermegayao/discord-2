@@ -1,11 +1,72 @@
-import type { ChannelDto, GuildWithChannelsDto, MessageDto } from '@discord-2/shared';
+import type {
+  ChannelDto,
+  DmChannelDto,
+  GuildWithChannelsDto,
+  MemberDto,
+  MessageDto,
+  PublicUserDto,
+} from '@discord-2/shared';
 import type { InfiniteData } from '@tanstack/react-query';
 
 export const queryKeys = {
   guilds: ['guilds'] as const,
   guild: (guildId: string) => ['guild', guildId] as const,
   messages: (channelId: string) => ['messages', channelId] as const,
+  members: (guildId: string) => ['members', guildId] as const,
+  dms: ['dms'] as const,
+  invite: (code: string) => ['invite', code] as const,
+  /** Presença recebida por eventos: userId → online. Vale mais que o valor das listas. */
+  presence: ['presence'] as const,
+  /** Quem está digitando em cada canal (efêmero, nunca vai para a API). */
+  typing: (channelId: string) => ['typing', channelId] as const,
 };
+
+export type PresenceMap = Record<string, boolean>;
+
+export interface TypingEntry {
+  user: PublicUserDto;
+  at: number;
+}
+export type TypingMap = Record<string, TypingEntry>;
+
+/** Quanto tempo um "digitando" vale sem um novo aviso. */
+export const TYPING_TTL_MS = 6000;
+
+export function upsertMember(list: MemberDto[] | undefined, member: MemberDto) {
+  if (!list) return list;
+  return list.some((m) => m.user.id === member.user.id)
+    ? list.map((m) => (m.user.id === member.user.id ? member : m))
+    : [...list, member];
+}
+
+export function removeMember(list: MemberDto[] | undefined, userId: string) {
+  return list?.filter((m) => m.user.id !== userId);
+}
+
+/** DM nova entra no topo; repetida não duplica. */
+export function upsertDm(list: DmChannelDto[] | undefined, dm: DmChannelDto) {
+  if (!list) return list;
+  return [dm, ...list.filter((d) => d.id !== dm.id)];
+}
+
+/** Quem digitou recentemente, sem o próprio usuário e sem avisos vencidos. */
+export function activeTypers(
+  typing: TypingMap | undefined,
+  myId: string | undefined,
+  now = Date.now(),
+): PublicUserDto[] {
+  return Object.values(typing ?? {})
+    .filter((t) => t.user.id !== myId && now - t.at < TYPING_TTL_MS)
+    .map((t) => t.user);
+}
+
+export function typingLabel(users: PublicUserDto[]): string | null {
+  const [a, b] = users;
+  if (!a) return null;
+  if (!b) return `${a.displayName} está digitando…`;
+  if (users.length === 2) return `${a.displayName} e ${b.displayName} estão digitando…`;
+  return 'Várias pessoas estão digitando…';
+}
 
 /** Mensagem como o front a guarda: pode estar "pendente" (otimista) ou ter falhado. */
 export type ChatMessage = MessageDto & { status?: 'pending' | 'failed' };

@@ -4,9 +4,11 @@ import { Navigate, Route, Routes } from 'react-router';
 import { AuthProvider } from './auth/AuthProvider';
 import { GuestOnly, RequireAuth } from './auth/RouteGuards';
 import { ChatView } from './chat/ChatView';
+import { DmChatView, DmHome, DmLayout } from './chat/DmLayout';
 import { GuildIndex, GuildLayout } from './chat/GuildLayout';
 import { AppLayout } from './layout/AppLayout';
 import { ChannelsHome } from './pages/ChannelsHome';
+import { InvitePage } from './pages/InvitePage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { createQueryClient } from './queryClient';
@@ -24,8 +26,14 @@ export function App({ queryClient }: { queryClient?: QueryClient }) {
             <Route path="/register" element={<RegisterPage />} />
           </Route>
           <Route element={<RequireAuth />}>
+            <Route path="/invite/:code" element={<InvitePage />} />
             <Route element={<AppLayout />}>
               <Route path="/channels" element={<ChannelsHome />} />
+              {/* Rota fixa "@me" tem prioridade sobre o parâmetro :guildId */}
+              <Route path="/channels/@me" element={<DmLayout />}>
+                <Route index element={<DmHome />} />
+                <Route path=":channelId" element={<DmChatView />} />
+              </Route>
               <Route path="/channels/:guildId" element={<GuildLayout />}>
                 <Route index element={<GuildIndex />} />
                 <Route path=":channelId" element={<ChatView />} />

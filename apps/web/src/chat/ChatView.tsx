@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useParams } from 'react-router';
 import { Composer } from './Composer';
 import { useGuildContext } from './guildContext';
 import { useDeleteChannel } from './hooks';
+import { MemberList } from './MemberList';
 import { MessageList } from './MessageList';
 
 export function ChatView() {
@@ -16,8 +17,10 @@ export function ChatView() {
   // Canal apagado (por outra pessoa ou em outra aba): volta para o primeiro canal.
   if (!channel) return <Navigate to={`/channels/${guild.id}`} replace />;
 
+  const label = `#${channel.name}`;
+
   const onDeleteChannel = async () => {
-    if (!window.confirm(`Apagar o canal #${channel.name}?`)) return;
+    if (!window.confirm(`Apagar o canal ${label}?`)) return;
     try {
       await deleteChannel.mutateAsync(channel.id);
       await navigate(`/channels/${guild.id}`, { replace: true });
@@ -27,30 +30,38 @@ export function ChatView() {
   };
 
   return (
-    <main className="chat" key={channel.id}>
-      <header className="chat__header">
-        <h1>
-          <span aria-hidden="true">#</span> {channel.name}
-        </h1>
-        {isOwner && (
-          <button
-            type="button"
-            className="icon-button"
-            title="Apagar canal"
-            aria-label="Apagar canal"
-            onClick={() => void onDeleteChannel()}
-          >
-            🗑
-          </button>
-        )}
-        {deleteError && (
-          <span className="form-error" role="alert">
-            {deleteError}
-          </span>
-        )}
-      </header>
-      <MessageList channel={channel} canModerate={isOwner} />
-      <Composer channel={channel} />
-    </main>
+    <>
+      <main className="chat" key={channel.id}>
+        <header className="chat__header">
+          <h1>
+            <span aria-hidden="true">#</span> {channel.name}
+          </h1>
+          {isOwner && (
+            <button
+              type="button"
+              className="icon-button"
+              title="Apagar canal"
+              aria-label="Apagar canal"
+              onClick={() => void onDeleteChannel()}
+            >
+              🗑
+            </button>
+          )}
+          {deleteError && (
+            <span className="form-error" role="alert">
+              {deleteError}
+            </span>
+          )}
+        </header>
+        <MessageList
+          channelId={channel.id}
+          label={label}
+          welcome={`Boas-vindas a ${label}!`}
+          canModerate={isOwner}
+        />
+        <Composer channelId={channel.id} label={label} />
+      </main>
+      <MemberList guildId={guild.id} ownerId={guild.ownerId} />
+    </>
   );
 }

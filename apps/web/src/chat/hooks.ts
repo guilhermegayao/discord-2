@@ -61,7 +61,7 @@ export function useMessages(channelId: string) {
   });
 }
 
-function addGuildToList(queryClient: QueryClient, guild: GuildDto) {
+export function addGuildToList(queryClient: QueryClient, guild: GuildDto) {
   queryClient.setQueryData<GuildDto[]>(queryKeys.guilds, (list) =>
     list && !list.some((g) => g.id === guild.id) ? [...list, guild] : list,
   );

@@ -17,6 +17,17 @@ export function AppLayout() {
     <div className="shell">
       <nav className="guild-bar" aria-label="Servidores">
         <ul>
+          <li>
+            <NavLink
+              to="/channels/@me"
+              className="guild-bar__item guild-bar__dms"
+              title="Mensagens diretas"
+              aria-label="Mensagens diretas"
+            >
+              💬
+            </NavLink>
+          </li>
+          <li className="guild-bar__separator" aria-hidden="true" />
           {guilds.data?.map((guild) => (
             <li key={guild.id}>
               <NavLink

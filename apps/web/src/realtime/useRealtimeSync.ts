@@ -1,13 +1,24 @@
-import type { GuildDto, GuildWithChannelsDto, ServerToClientEvents } from '@discord-2/shared';
+import type {
+  DmChannelDto,
+  GuildDto,
+  GuildWithChannelsDto,
+  MemberDto,
+  ServerToClientEvents,
+} from '@discord-2/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import {
   type MessagesData,
+  type PresenceMap,
   queryKeys,
   removeChannel,
+  removeMember,
   removeMessage,
   replaceMessage,
+  type TypingMap,
   upsertChannel,
+  upsertDm,
+  upsertMember,
   upsertMessage,
 } from '../chat/cache';
 import { markGuildDeleted } from '../chat/hooks';
@@ -35,9 +46,26 @@ export function useRealtimeSync(): void {
       queryClient.setQueryData<MessagesData>(queryKeys.messages(channelId), fn);
     const setGuildList = (fn: (list?: GuildDto[]) => GuildDto[] | undefined) =>
       queryClient.setQueryData<GuildDto[]>(queryKeys.guilds, fn);
+    const setPresence = (userId: string, online: boolean) =>
+      queryClient.setQueryData<PresenceMap>(queryKeys.presence, (p) => ({
+        ...p,
+        [userId]: online,
+      }));
+
+    const setTyping = (channelId: string, fn: (t: TypingMap) => TypingMap) =>
+      queryClient.setQueryData<TypingMap>(queryKeys.typing(channelId), (t) => fn(t ?? {}));
 
     const handlers: ServerToClientEvents = {
-      'message:created': (m) => setMessages(m.channelId, (d) => upsertMessage(d, m)),
+      'message:created': (m) => {
+        setMessages(m.channelId, (d) => upsertMessage(d, m));
+        // Quem mandou a mensagem parou de digitar.
+        setTyping(m.channelId, ({ [m.author.id]: _sent, ...rest }) => rest);
+        // A conversa com a última mensagem sobe para o topo da lista de DMs.
+        queryClient.setQueryData<DmChannelDto[]>(queryKeys.dms, (list) => {
+          const dm = list?.find((d) => d.id === m.channelId);
+          return dm ? upsertDm(list, { ...dm, lastMessageAt: m.createdAt }) : list;
+        });
+      },
       'message:updated': (m) => setMessages(m.channelId, (d) => replaceMessage(d, m)),
       'message:deleted': ({ id, channelId }) => setMessages(channelId, (d) => removeMessage(d, id)),
       'channel:created': (c) => setGuild(c.guildId, (g) => upsertChannel(g, c)),
@@ -58,11 +86,33 @@ export function useRealtimeSync(): void {
         setGuild(guild.id, (g) => ({ ...g, ...guild }));
       },
       'guild:deleted': ({ id }) => markGuildDeleted(queryClient, id),
+      'guild:removed': ({ id }) => markGuildDeleted(queryClient, id),
+      'member:joined': ({ guildId, member }) => {
+        queryClient.setQueryData<MemberDto[]>(queryKeys.members(guildId), (list) =>
+          upsertMember(list, member),
+        );
+        setPresence(member.user.id, member.online);
+      },
+      'member:left': ({ guildId, userId }) =>
+        queryClient.setQueryData<MemberDto[]>(queryKeys.members(guildId), (list) =>
+          removeMember(list, userId),
+        ),
+      'presence:update': ({ userId, online }) => setPresence(userId, online),
+      typing: ({ channelId, user }) =>
+        setTyping(channelId, (t) => ({ ...t, [user.id]: { user, at: Date.now() } })),
+      'dm:created': (dm) =>
+        queryClient.setQueryData<DmChannelDto[]>(queryKeys.dms, (list) =>
+          list?.some((d) => d.id === dm.id) ? list : upsertDm(list, dm),
+        ),
     };
 
     // Em toda (re)conexão, recarrega o que estiver na tela: cobre os eventos
-    // perdidos enquanto o socket esteve desconectado.
-    const onConnect = () => void queryClient.invalidateQueries();
+    // perdidos enquanto o socket esteve desconectado. A presença guardada pode
+    // estar velha; zera para valer a que vem da API.
+    const onConnect = () => {
+      queryClient.setQueryData<PresenceMap>(queryKeys.presence, {});
+      void queryClient.invalidateQueries();
+    };
 
     const events = Object.keys(handlers) as (keyof ServerToClientEvents)[];
     socket.on('connect', onConnect);

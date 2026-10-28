@@ -9,6 +9,13 @@ type Listener = (...args: unknown[]) => void;
 class FakeSocket {
   private listeners = new Map<string, Set<Listener>>();
   connected = false;
+  /** Eventos que o app enviou ao "servidor" (ex.: typing:start). */
+  emitted: { event: string; payload: unknown }[] = [];
+
+  emit(event: string, payload?: unknown): this {
+    this.emitted.push({ event, payload });
+    return this;
+  }
 
   on(event: string, listener: Listener): this {
     if (!this.listeners.has(event)) this.listeners.set(event, new Set());
@@ -47,6 +54,7 @@ class FakeSocket {
   reset(): void {
     this.listeners.clear();
     this.connected = false;
+    this.emitted = [];
   }
 
   private fire(event: string, ...args: unknown[]): void {

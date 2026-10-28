@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router';
 import { useAuth } from './AuthContext';
+import { redirectTarget } from './redirect';
 
 function Splash() {
   return (
@@ -21,11 +22,18 @@ export function RequireAuth() {
   return <Outlet />;
 }
 
-/** Login e cadastro: quem já está logado vai direto para a home. */
+/**
+ * Login e cadastro: quem já está logado vai para onde queria ir (ex.: o
+ * convite) ou para a home. Usa o mesmo destino que as páginas, para as duas
+ * navegações não competirem logo depois do login.
+ */
 export function GuestOnly() {
   const { status } = useAuth();
+  const location = useLocation();
 
   if (status === 'loading') return <Splash />;
-  if (status === 'authenticated') return <Navigate to="/" replace />;
+  if (status === 'authenticated') {
+    return <Navigate to={redirectTarget(location.state)} replace />;
+  }
   return <Outlet />;
 }

@@ -3,6 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
+import { redirectTarget } from '../auth/redirect';
 import { applyServerErrors } from '../auth/serverErrors';
 import { FormField } from '../components/FormField';
 
@@ -10,7 +11,7 @@ export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: string } | null)?.from ?? '/';
+  const from = redirectTarget(location.state);
 
   const {
     register,
@@ -59,7 +60,10 @@ export function LoginPage() {
           {isSubmitting ? 'Entrando…' : 'Entrar'}
         </button>
         <p className="muted">
-          Não tem conta? <Link to="/register">Cadastre-se</Link>
+          Não tem conta?{' '}
+          <Link to="/register" state={location.state as unknown}>
+            Cadastre-se
+          </Link>
         </p>
       </form>
     </main>

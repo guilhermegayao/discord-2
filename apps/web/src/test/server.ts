@@ -72,6 +72,8 @@ export const server = setupServer(
   http.post('/api/auth/refresh', () => unauthorized()),
   http.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })),
   http.get('/api/guilds', () => HttpResponse.json([])),
+  http.get('/api/guilds/:guildId/members', () => HttpResponse.json([])),
+  http.get('/api/dms', () => HttpResponse.json([])),
   http.get('/api/health', () =>
     HttpResponse.json({ status: 'ok', uptime: 42, timestamp: new Date().toISOString(), db: 'up' }),
   ),

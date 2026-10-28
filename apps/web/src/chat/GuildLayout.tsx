@@ -4,6 +4,8 @@ import { useAuth } from '../auth/AuthContext';
 import { CreateChannelModal } from './CreateChannelModal';
 import { type GuildContext, useGuildContext } from './guildContext';
 import { useDeleteGuild, useGuild } from './hooks';
+import { InviteModal } from './InviteModal';
+import { useLeaveGuild } from './socialHooks';
 
 /** Coluna de canais de um servidor + o canal aberto. */
 export function GuildLayout() {
@@ -12,7 +14,9 @@ export function GuildLayout() {
   const navigate = useNavigate();
   const guild = useGuild(guildId);
   const deleteGuild = useDeleteGuild();
+  const leaveGuild = useLeaveGuild();
   const [creatingChannel, setCreatingChannel] = useState(false);
+  const [inviting, setInviting] = useState(false);
 
   // data === null: o servidor foi apagado (aqui ou em outra aba, via socket).
   // isError: sem acesso ou id inválido (a API responde 404).
@@ -30,22 +34,49 @@ export function GuildLayout() {
     await navigate('/channels', { replace: true });
   };
 
+  const onLeaveGuild = async () => {
+    if (!window.confirm(`Sair do servidor "${data.name}"?`)) return;
+    await leaveGuild.mutateAsync(data.id);
+    await navigate('/channels', { replace: true });
+  };
+
   return (
     <>
       <aside className="channel-bar">
         <header className="channel-bar__header">
           <h2 title={data.name}>{data.name}</h2>
-          {isOwner && (
+          <span className="channel-bar__actions">
             <button
               type="button"
               className="icon-button"
-              title="Apagar servidor"
-              aria-label="Apagar servidor"
-              onClick={() => void onDeleteGuild()}
+              title="Convidar pessoas"
+              aria-label="Convidar pessoas"
+              onClick={() => setInviting(true)}
             >
-              🗑
+              ➕👤
             </button>
-          )}
+            {isOwner ? (
+              <button
+                type="button"
+                className="icon-button"
+                title="Apagar servidor"
+                aria-label="Apagar servidor"
+                onClick={() => void onDeleteGuild()}
+              >
+                🗑
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="icon-button"
+                title="Sair do servidor"
+                aria-label="Sair do servidor"
+                onClick={() => void onLeaveGuild()}
+              >
+                🚪
+              </button>
+            )}
+          </span>
         </header>
 
         <div className="channel-bar__section">
@@ -79,6 +110,9 @@ export function GuildLayout() {
 
       {creatingChannel && (
         <CreateChannelModal guildId={data.id} onClose={() => setCreatingChannel(false)} />
+      )}
+      {inviting && (
+        <InviteModal guildId={data.id} guildName={data.name} onClose={() => setInviting(false)} />
       )}
     </>
   );

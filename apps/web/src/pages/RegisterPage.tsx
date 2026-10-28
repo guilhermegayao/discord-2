@@ -1,14 +1,17 @@
 import { type RegisterData, type RegisterInput, registerSchema } from '@discord-2/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
+import { redirectTarget } from '../auth/redirect';
 import { applyServerErrors } from '../auth/serverErrors';
 import { FormField } from '../components/FormField';
 
 export function RegisterPage() {
   const { register: signUp } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = redirectTarget(location.state);
 
   const {
     register,
@@ -20,7 +23,7 @@ export function RegisterPage() {
   const onSubmit = handleSubmit(async (data) => {
     try {
       await signUp(data);
-      await navigate('/', { replace: true });
+      await navigate(from, { replace: true });
     } catch (err) {
       applyServerErrors(err, setError);
     }
@@ -68,7 +71,10 @@ export function RegisterPage() {
           {isSubmitting ? 'Criando…' : 'Criar conta'}
         </button>
         <p className="muted">
-          Já tem conta? <Link to="/login">Entrar</Link>
+          Já tem conta?{' '}
+          <Link to="/login" state={location.state as unknown}>
+            Entrar
+          </Link>
         </p>
       </form>
     </main>
