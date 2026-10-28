@@ -81,19 +81,16 @@ export function markMessageFailed(
 }
 
 /** Insere ou atualiza um canal na lista do servidor, mantendo a ordem por posição. */
-export function upsertChannel(
-  guild: GuildWithChannelsDto | undefined,
-  channel: ChannelDto,
-): GuildWithChannelsDto | undefined {
+/** `null` = servidor apagado; `undefined` = ainda não carregado. Nos dois casos, nada muda. */
+type CachedGuild = GuildWithChannelsDto | null | undefined;
+
+export function upsertChannel(guild: CachedGuild, channel: ChannelDto): CachedGuild {
   if (!guild) return guild;
   const others = guild.channels.filter((c) => c.id !== channel.id);
   return { ...guild, channels: [...others, channel].sort((a, b) => a.position - b.position) };
 }
 
-export function removeChannel(
-  guild: GuildWithChannelsDto | undefined,
-  channelId: string,
-): GuildWithChannelsDto | undefined {
+export function removeChannel(guild: CachedGuild, channelId: string): CachedGuild {
   if (!guild) return guild;
   return { ...guild, channels: guild.channels.filter((c) => c.id !== channelId) };
 }

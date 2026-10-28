@@ -14,8 +14,9 @@ export function GuildLayout() {
   const deleteGuild = useDeleteGuild();
   const [creatingChannel, setCreatingChannel] = useState(false);
 
-  // Servidor apagado, sem acesso ou id inválido: volta para o início.
-  if (guild.isError || (guild.isSuccess && !guild.data)) return <Navigate to="/channels" replace />;
+  // data === null: o servidor foi apagado (aqui ou em outra aba, via socket).
+  // isError: sem acesso ou id inválido (a API responde 404).
+  if (guild.data === null || guild.isError) return <Navigate to="/channels" replace />;
   if (!guild.data) return <aside className="channel-bar" aria-busy="true" />;
 
   const data = guild.data;

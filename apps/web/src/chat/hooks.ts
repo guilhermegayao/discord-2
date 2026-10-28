@@ -1,4 +1,9 @@
-import type { CreateChannelData, CreateGuildData, GuildDto } from '@discord-2/shared';
+import type {
+  CreateChannelData,
+  CreateGuildData,
+  GuildDto,
+  GuildWithChannelsDto,
+} from '@discord-2/shared';
 import {
   type QueryClient,
   useInfiniteQuery,
@@ -25,12 +30,25 @@ export function useGuilds() {
   return useQuery({ queryKey: queryKeys.guilds, queryFn: chatApi.listGuilds });
 }
 
+/** `data === null` significa "este servidor foi apagado" (ver markGuildDeleted). */
 export function useGuild(guildId: string | undefined) {
-  return useQuery({
+  return useQuery<GuildWithChannelsDto | null>({
     queryKey: queryKeys.guild(guildId ?? ''),
     queryFn: () => chatApi.getGuild(guildId!),
     enabled: Boolean(guildId),
   });
+}
+
+/**
+ * Tira o servidor da lista e marca o cache dele como `null`. A tela aberta
+ * nele percebe na hora e sai. (Remover a query do cache não bastaria: quem
+ * já está observando continuaria vendo os dados antigos.)
+ */
+export function markGuildDeleted(queryClient: QueryClient, guildId: string): void {
+  queryClient.setQueryData<GuildDto[]>(queryKeys.guilds, (list) =>
+    list?.filter((g) => g.id !== guildId),
+  );
+  queryClient.setQueryData<GuildWithChannelsDto | null>(queryKeys.guild(guildId), null);
 }
 
 /** Histórico do canal em páginas; a próxima página é a das mensagens mais antigas. */
@@ -65,12 +83,7 @@ export function useDeleteGuild() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (guildId: string) => chatApi.deleteGuild(guildId),
-    onSuccess: (_, guildId) => {
-      queryClient.setQueryData<GuildDto[]>(queryKeys.guilds, (list) =>
-        list?.filter((g) => g.id !== guildId),
-      );
-      queryClient.removeQueries({ queryKey: queryKeys.guild(guildId) });
-    },
+    onSuccess: (_, guildId) => markGuildDeleted(queryClient, guildId),
   });
 }
 
@@ -79,9 +92,8 @@ export function useCreateChannel(guildId: string) {
   return useMutation({
     mutationFn: (data: CreateChannelData) => chatApi.createChannel(guildId, data),
     onSuccess: (channel) => {
-      queryClient.setQueryData(
-        queryKeys.guild(guildId),
-        (guild: Parameters<typeof upsertChannel>[0]) => upsertChannel(guild, channel),
+      queryClient.setQueryData<GuildWithChannelsDto | null>(queryKeys.guild(guildId), (guild) =>
+        upsertChannel(guild, channel),
       );
     },
   });
@@ -92,9 +104,8 @@ export function useDeleteChannel(guildId: string) {
   return useMutation({
     mutationFn: (channelId: string) => chatApi.deleteChannel(channelId),
     onSuccess: (_, channelId) => {
-      queryClient.setQueryData(
-        queryKeys.guild(guildId),
-        (guild: Parameters<typeof removeChannel>[0]) => removeChannel(guild, channelId),
+      queryClient.setQueryData<GuildWithChannelsDto | null>(queryKeys.guild(guildId), (guild) =>
+        removeChannel(guild, channelId),
       );
       queryClient.removeQueries({ queryKey: queryKeys.messages(channelId) });
     },

@@ -10,6 +10,7 @@ import {
   upsertChannel,
   upsertMessage,
 } from '../chat/cache';
+import { markGuildDeleted } from '../chat/hooks';
 import { disconnectSocket, getSocket } from './socket';
 
 /**
@@ -22,10 +23,14 @@ export function useRealtimeSync(): void {
 
   useEffect(() => {
     const socket = getSocket();
+    /** Atualiza um servidor que está no cache (ignora se não carregado ou já apagado). */
     const setGuild = (
       id: string,
-      fn: (g?: GuildWithChannelsDto) => GuildWithChannelsDto | undefined,
-    ) => queryClient.setQueryData<GuildWithChannelsDto>(queryKeys.guild(id), fn);
+      fn: (g: GuildWithChannelsDto) => GuildWithChannelsDto | null | undefined,
+    ) =>
+      queryClient.setQueryData<GuildWithChannelsDto | null>(queryKeys.guild(id), (g) =>
+        g ? fn(g) : g,
+      );
     const setMessages = (channelId: string, fn: (d?: MessagesData) => MessagesData | undefined) =>
       queryClient.setQueryData<MessagesData>(queryKeys.messages(channelId), fn);
     const setGuildList = (fn: (list?: GuildDto[]) => GuildDto[] | undefined) =>
@@ -46,16 +51,13 @@ export function useRealtimeSync(): void {
         setGuildList((list) =>
           list && !list.some((g) => g.id === guild.id) ? [...list, summary] : list,
         );
-        setGuild(guild.id, () => guild);
+        queryClient.setQueryData(queryKeys.guild(guild.id), guild);
       },
       'guild:updated': (guild) => {
         setGuildList((list) => list?.map((g) => (g.id === guild.id ? guild : g)));
-        setGuild(guild.id, (g) => (g ? { ...g, ...guild } : g));
+        setGuild(guild.id, (g) => ({ ...g, ...guild }));
       },
-      'guild:deleted': ({ id }) => {
-        setGuildList((list) => list?.filter((g) => g.id !== id));
-        queryClient.removeQueries({ queryKey: queryKeys.guild(id) });
-      },
+      'guild:deleted': ({ id }) => markGuildDeleted(queryClient, id),
     };
 
     // Em toda (re)conexão, recarrega o que estiver na tela: cobre os eventos
