@@ -14,8 +14,8 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 | ---- | ------------------------------------------------------------------------- | ------------ |
 | 0    | Fundação: monorepo, Postgres, `/health`, tela inicial, lint, testes, CI   | ✅ Concluída |
 | 1    | Contas: cadastro, login, sessão persistente com refresh token             | ✅ Concluída |
-| 2    | Servidores e chat: canais de texto, mensagens em tempo real, paginação    | ⏳ Próxima   |
-| 3    | Social: convites, membros, presença, "digitando...", DMs                  | —            |
+| 2    | Servidores e chat: canais de texto, mensagens em tempo real, paginação    | ✅ Concluída |
+| 3    | Social: convites, membros, presença, "digitando...", DMs                  | ⏳ Próxima   |
 | 4    | Voz com LiveKit                                                           | —            |
 | 5    | Compartilhamento de tela no navegador (getDisplayMedia)                   | —            |
 | 6    | App desktop Electron: seletor de tela/janela, áudio do sistema, `.exe`    | —            |
@@ -127,16 +127,91 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 
 ---
 
-## Fase 2 — Servidores e chat (próxima)
+## Fase 2 — Servidores e chat ✅ (28/10/2026)
 
-Escopo previsto: criar servidor, canais de texto, mensagens em tempo real (Socket.IO), histórico paginado.
+### O que foi feito
+
+- **Banco**: models `Guild`, `Member` (papel `OWNER`/`MEMBER`), `Channel` (`TEXT`) e `Message` (até 2000 caracteres), com índice `(channel_id, id DESC)` para o histórico.
+- **`shared`**: schemas de servidor, canal, mensagem e paginação. A interface `ServerToClientEvents`, compartilhada, tipa os eventos do Socket.IO nos dois lados.
+- **Servidor (REST)**:
+  - `/api/guilds` (listar, criar, ver, renomear, apagar);
+  - `/api/guilds/:id/channels`;
+  - `/api/channels/:id` (renomear, apagar);
+  - `/api/channels/:id/messages` (listar paginado, enviar);
+  - `/api/messages/:id` (editar, apagar).
+  - Criar servidor cria também o dono e o `#geral` numa transação.
+  - Regras: quem não é membro recebe **404**. O dono gerencia o servidor e os canais. O autor edita a mensagem. Autor ou dono apagam. Todo servidor mantém pelo menos um canal.
+  - **Paginação por cursor** com o id UUID v7 (`?before=<id>&limit=50`); busca N+1 para saber se há mais páginas.
+  - **Rate limit por usuário** (5 mensagens a cada 5 s). Para isso, o `AuthGuard` passou a rodar antes do throttler.
+- **Servidor (tempo real)**: gateway Socket.IO em `/api/socket.io`. O token é validado no _handshake_ (sem token válido, a conexão é recusada). Cada socket entra numa sala por servidor e numa sala do próprio usuário. Os eventos são emitidos **depois** de gravar no banco.
+- **Web**:
+  - Layout estilo Discord: barra de servidores, lista de canais e chat. Rotas `/channels/:guildId/:channelId`.
+  - **TanStack Query** guarda os dados. O socket só atualiza o cache, e as telas não sabem que ele existe. Em toda reconexão, o app recarrega o que está na tela.
+  - Histórico com rolagem para cima que **mantém a posição** da tela.
+  - **Envio otimista com `nonce`**: a mensagem aparece na hora e é reconciliada com a resposta HTTP ou com o eco do socket, o que chegar primeiro, sem duplicar. Se falhar, dá para "Tentar de novo" ou "Descartar".
+  - Editar e apagar mensagens; criar servidor e canal em modais.
+- **Testes (142 no total)**:
+  - shared: 26;
+  - server: 75, incluindo 7 de tempo real com `socket.io-client` de verdade e paginação nas bordas;
+  - web: 41, com MSW e um socket falso.
+- **Testado no navegador**: duas abas, mensagem e canal novo aparecendo na outra na hora; 121 mensagens paginadas sem duplicar e sem a tela pular.
+
+### Decisões tomadas
+
+| Decisão                                                       | Motivo                                                                                                                                            |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`Guild` no código**, "Servidor" na tela                     | "Server" já é o backend e o `http.Server`. É o mesmo nome que o Discord usa na API.                                                               |
+| **Escrita por REST, distribuição por Socket.IO**              | Validação, auth, rate limit e testes já existem no REST. O socket só avisa. O cliente não envia eventos (`ClientToServerEvents` vazio).           |
+| **Cursor = id UUID v7**                                       | Estável quando chegam mensagens novas, usa índice e não precisa de coluna extra. Com `OFFSET`, a página "anda" e fica lenta com histórico grande. |
+| **404 para quem não é membro**                                | Não confirma a existência de servidores, canais ou mensagens para quem está de fora.                                                              |
+| **Socket no caminho `/api/socket.io`**                        | Passa pelo mesmo proxy do Vite (com `ws: true`) e, em produção, pelo mesmo domínio da API.                                                        |
+| **Token do socket como função** (`auth: cb => cb({ token })`) | A cada reconexão vai o access token atual. Se o handshake falhar por token expirado, o cliente renova a sessão e tenta uma vez.                   |
+| **`null` no cache = servidor apagado**                        | Remover a query do cache não bastava: a tela aberta continuava vendo dados antigos. O `null` é um marcador explícito.                             |
+| **Funções de cache puras** (`upsertMessage` etc.)             | Testáveis sem React. A mesma função atende a resposta HTTP e o evento do socket, e por isso a ordem de chegada não importa.                       |
+
+### Imprevistos encontrados
+
+- **Bug real encontrado por teste:** apagar o servidor aberto (em outra aba) deixava a tela presa nele. A causa era o `removeQueries`, que não avisa quem já está observando a query. Corrigido com o marcador `null` e confirmado com um teste de mutação.
+- **Bug real de ordenação:** "meus servidores" ordenava por `joinedAt`, que tem precisão de milissegundo. Dois servidores no mesmo ms vinham em ordem aleatória. Isso apareceu como um teste instável (falhava raramente). Agora o id desempata, com um teste **determinístico** que falha sem a correção.
+- **Crash nativo intermitente nos testes do servidor (Windows):** raramente (~2 em 40 rodadas), um worker do Vitest morre com o código `0xC0000409` (_stack buffer overrun_), ou seja, falha dentro de um módulo nativo. Suspeitos: `argon2` (nativo) ou o WebSocket. Não reproduz sob demanda. **Próximo passo, se voltar a aparecer:** rodar a suíte em loop com `argon2` trocado por `@node-rs/argon2` (binário pronto, sem node-gyp) para ver se some. No CI (Linux) nunca apareceu.
+- O `removeAllListeners()` na limpeza do socket apagaria também os listeners internos (o retry do token). Com o `StrictMode` montando duas vezes, isso quebraria em dev. Agora o efeito remove só o que registrou.
+- Accessible name: o `#` dos canais é `aria-hidden`, então o nome lido por leitores de tela (e usado nos testes) é só "geral".
+- O PowerShell estragou de novo dois comandos de substituição (aspas e `$1`). Regra: editar arquivos só com o editor, nunca com scripts no PowerShell.
+
+### Pendências e observações
+
+- Um socket já conectado continua aceito depois que o access token dele expira; isso só é revalidado na reconexão. Aceitável por agora.
+- Um único servidor Node: para várias instâncias, o Socket.IO vai precisar do adapter Redis.
+- Telas estreitas (< 700 px) escondem a lista de canais. A navegação mobile de verdade é da Fase 8.
+- Na Fase 3, entrar num servidor por convite deve chamar `addUserToGuild` no gateway (já existe) e emitir `guild:created` para o usuário.
+
+---
+
+## Fase 3 — Social (próxima)
+
+Escopo previsto: convite por link, lista de membros, presença online/offline, "digitando..." e mensagens diretas.
 _Plano detalhado a ser apresentado antes de começar._
+
+---
+
+## Tópicos para estudo (explicação completa no fim do projeto)
+
+> A pedido do Guilherme, os tópicos de estudo/entrevista são guardados aqui e explicados todos juntos quando o projeto terminar.
+
+- **Fase 0:** monorepo e workspaces; ESM vs CommonJS; schema como fonte da verdade (Zod); teste de unidade vs integração; proxy de dev vs CORS; health check (liveness/readiness, 200 vs 503); CI reproduzível ("funciona na minha máquina").
+- **Fase 1:** hash de senha (argon2id) vs hash de token (SHA-256); access token vs refresh token; onde guardar token no front (memória, localStorage, cookie httpOnly; XSS e CSRF); rotação com detecção de reuso; ataques de timing e enumeração de usuários; seguro por padrão (guard global); MSW vs mock de `fetch`; teste de mutação; Web Locks e corrida entre abas.
+- **Fase 2:** paginação por cursor vs OFFSET; UUID v7; REST para escrita e WebSocket para distribuição; rooms do Socket.IO e escala horizontal (adapter Redis); UI otimista e reconciliação com `nonce`; transações; 404 vs 403; cache como fonte da tela (TanStack Query); testes instáveis (flaky) e como transformá-los em testes determinísticos; ordem dos guards no Nest.
 
 ---
 
 ## Backlog (ideias para depois)
 
 - Teste **E2E com Playwright** (cadastro e login num navegador de verdade, rodando no CI).
+- Indicador de mensagens não lidas e menções.
+- Markdown e links clicáveis nas mensagens.
+- Anexos, reações, busca e histórico de edições.
+- Adapter Redis do Socket.IO (várias instâncias do servidor).
+- Reordenar canais arrastando.
 - Recuperação de senha por e-mail.
 - Login com Google/GitHub.
 - Avatar do usuário.

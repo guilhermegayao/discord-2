@@ -6,13 +6,21 @@ App de chat, voz e **compartilhamento de tela** no estilo Discord, feito para us
 
 ## Stack
 
-| Parte         | Tecnologias                                                               |
-| ------------- | ------------------------------------------------------------------------- |
-| Servidor      | NestJS 12, Prisma 7, PostgreSQL 17, Zod                                   |
-| Web           | React 19, Vite 8, TypeScript                                              |
-| Compartilhado | `@discord-2/shared`: schemas Zod e tipos usados por todos os apps         |
-| Qualidade     | Vitest, Testing Library, supertest, ESLint, Prettier, GitHub Actions      |
-| Em breve      | Socket.IO (chat), LiveKit (voz e tela), Electron (desktop), Expo (mobile) |
+| Parte         | Tecnologias                                                                          |
+| ------------- | ------------------------------------------------------------------------------------ |
+| Servidor      | NestJS 12, Prisma 7, PostgreSQL 17, Socket.IO, Zod                                   |
+| Web           | React 19, Vite 8, TanStack Query, React Router, TypeScript                           |
+| Compartilhado | `@discord-2/shared`: schemas Zod, tipos e eventos do socket usados por todos os apps |
+| Qualidade     | Vitest, Testing Library, MSW, supertest, ESLint, Prettier, GitHub Actions            |
+| Em breve      | LiveKit (voz e tela), Electron (desktop), Expo (mobile)                              |
+
+## O que já funciona
+
+- Contas: cadastro, login e sessão que sobrevive ao F5, com rotação de refresh token.
+- Servidores e canais de texto, no estilo Discord.
+- Chat em **tempo real**: mensagens aparecem na hora em todas as abas e dispositivos, com envio otimista.
+- Histórico paginado: rolando para cima, as mensagens antigas carregam sem a tela pular.
+- Editar e apagar mensagens (o dono do servidor pode moderar).
 
 ## Estrutura
 
