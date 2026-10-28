@@ -21,6 +21,14 @@ App de chat, voz e **compartilhamento de tela** no estilo Discord, feito para us
 - Chat em **tempo real**: mensagens aparecem na hora em todas as abas e dispositivos, com envio otimista.
 - Histórico paginado: rolando para cima, as mensagens antigas carregam sem a tela pular.
 - Editar e apagar mensagens (o dono do servidor pode moderar).
+- **Convite por link** (funciona até para quem ainda não tem conta: cadastra e volta para o convite).
+- Lista de membros com **online/offline** ao vivo, sair do servidor e expulsar.
+- "**Fulano está digitando…**"
+- **Mensagens diretas** entre quem divide um servidor.
+
+### Testar com duas contas no mesmo navegador
+
+Cada origem guarda seus próprios cookies. Use uma conta em `http://localhost:5174` e outra em `http://[::1]:5174`, ou dois navegadores diferentes.
 
 ## Estrutura
 

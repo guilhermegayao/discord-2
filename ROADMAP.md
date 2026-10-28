@@ -15,8 +15,8 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 | 0    | Fundação: monorepo, Postgres, `/health`, tela inicial, lint, testes, CI   | ✅ Concluída |
 | 1    | Contas: cadastro, login, sessão persistente com refresh token             | ✅ Concluída |
 | 2    | Servidores e chat: canais de texto, mensagens em tempo real, paginação    | ✅ Concluída |
-| 3    | Social: convites, membros, presença, "digitando...", DMs                  | ⏳ Próxima   |
-| 4    | Voz com LiveKit                                                           | —            |
+| 3    | Social: convites, membros, presença, "digitando...", DMs                  | ✅ Concluída |
+| 4    | Voz com LiveKit                                                           | ⏳ Próxima   |
 | 5    | Compartilhamento de tela no navegador (getDisplayMedia)                   | —            |
 | 6    | App desktop Electron: seletor de tela/janela, áudio do sistema, `.exe`    | —            |
 | 7    | Deploy gratuito (back, banco, LiveKit Cloud)                              | —            |
@@ -187,9 +187,66 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 
 ---
 
-## Fase 3 — Social (próxima)
+## Fase 3 — Social ✅ (28/10/2026)
 
-Escopo previsto: convite por link, lista de membros, presença online/offline, "digitando..." e mensagens diretas.
+### O que foi feito
+
+- **Banco**: tabela `invites` (código curto, usos, expiração). `channels` agora também guarda **DMs** (`type: DM`, sem servidor, com `channel_participants` e uma `dm_key` única por par de pessoas).
+- **Convites**: qualquer membro gera um link (`/invite/<código>`) de 1 dia, 7 dias ou sem prazo. O dono lista e revoga. A prévia mostra o servidor e o nº de membros. Aceitar duas vezes não duplica. Convite expirado ou revogado tem a mesma resposta de inexistente.
+- **Membros**: lista com papel e online/offline. Um membro pode sair; o dono expulsa (e não pode sair nem se expulsar). Quem sai ou é expulso **sai das salas do socket na hora**.
+- **Presença**: contador de sockets por usuário no gateway. Online com pelo menos uma aba aberta. Offline só depois de `PRESENCE_GRACE_MS` (5 s) sem nenhuma, para não "piscar" num F5.
+- **"Digitando..."**: primeiro evento enviado pelo cliente (`typing:start`). O servidor valida formato, frequência (1 a cada 2 s por canal) e acesso, e repassa só para os outros membros. O cliente envia no máximo a cada 3 s. O aviso some em 6 s ou quando a mensagem dessa pessoa chega.
+- **DMs**: abertas pela lista de membros (💬), só entre quem divide algum servidor. Reaproveitam tudo do chat (paginação, envio otimista, edição). Os eventos vão só para os dois participantes. Ficam em `/channels/@me`.
+- **Web**:
+  - página de convite;
+  - modal "Convidar pessoas" com botão de copiar;
+  - coluna de membros (online/offline, com expulsar e abrir DM);
+  - indicador de digitando;
+  - área de mensagens diretas;
+  - o fluxo **deslogado → login/cadastro → volta ao convite**.
+- **Testes (204 no total)**:
+  - shared: 29;
+  - server: 105, incluindo **12 de tempo real com sockets de verdade** (presença com várias abas e F5, digitando, convite, saída e DM);
+  - web: 70.
+- **Testado no navegador com duas contas ao mesmo tempo:**
+  - Gui em `localhost` e Ana em `[::1]`, origens diferentes e portanto cookies separados.
+  - Convite: deslogada → cadastro → volta ao convite → entrar.
+  - Os dois online na lista, "Ana está digitando…" aparecendo e sumindo, DM em tempo real.
+  - Ao fechar a aba da Ana, ela continuou online por ~5 s e depois ficou offline.
+
+### Decisões tomadas
+
+| Decisão                                           | Motivo                                                                                                                                                                                                                                 |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **DM = canal sem servidor**                       | Mensagens, paginação, edição e envio otimista funcionam igual, sem código duplicado. O TypeScript apontou cada lugar que assumia "todo canal tem servidor".                                                                            |
+| **`AccessModule` separado**                       | O gateway passou a precisar das regras de acesso (para o "digitando"), e o módulo de chat já dependia do gateway. Um módulo próprio evita a dependência circular.                                                                      |
+| **Presença em memória + prazo de 5 s**            | Simples para um servidor só. Com várias instâncias, vai precisar de Redis (anotado no backlog). O prazo evita o "pisca" no F5.                                                                                                         |
+| **"Digitando" pelo socket, não pela API**         | É efêmero: não vai para o banco, e uma requisição HTTP para isso seria desperdício. O servidor limita e confere acesso.                                                                                                                |
+| **Convite expirado = 404**                        | Não revela se o código existiu. Códigos de 8 caracteres aleatórios (48 bits) e rate limit de 20/min nas rotas de convite dificultam chutar.                                                                                            |
+| **Destino pós-login validado** (`redirectTarget`) | Só aceita caminhos internos (`/...`), nunca `//site` ou `https://...`: evita _open redirect_.                                                                                                                                          |
+| **Estado só do cliente no TanStack Query**        | Presença e "digitando" ficam no mesmo cache. O `queryFn` devolve o que já está guardado, para que o `invalidateQueries()` da reconexão não apague o que os eventos preencheram. Na reconexão a presença é zerada, para valer a da API. |
+
+### Imprevistos encontrados
+
+- **Bug real encontrado por teste:** os **guards globais do Nest também rodam nos eventos do WebSocket**. O `AuthGuard` tentava ler o header HTTP, que não existe ali, e quebrava; nenhum "digitando" funcionava. Agora os dois guards globais valem só para HTTP (o socket já é autenticado no handshake).
+- Um teste ("ignora canal sem acesso") **passava por acaso** enquanto o bug acima existia, porque nada funcionava. Depois da correção, confirmei com um teste de mutação (removendo a checagem de acesso) que ele de fato protege.
+- **Iniciais erradas:** "Ana (teste)" virava "A(". Agora a função usa a primeira letra ou número de cada palavra (com teste).
+- `prisma migrate dev` para no aviso de índice único e o terminal daqui não é interativo. A migration foi gerada com `prisma migrate diff` e aplicada com `migrate deploy`.
+- Errei um `git add` (citei um arquivo já removido e o git cancelou tudo), e dois commits ficaram com conteúdo trocado. Como não tinham sido enviados, refiz com `git reset --soft` num commit só, que compila.
+- Para testar duas contas no mesmo navegador: `127.0.0.1` não responde (o Vite escuta só em IPv6), mas `http://[::1]:5174` funciona como segunda origem.
+
+### Pendências e observações
+
+- O dono não pode sair; transferir a posse do servidor fica para depois.
+- A lista de membros não pagina (ok para grupos de amigos; rever se crescer).
+- A presença e o "digitando" são por instância do servidor (ver Redis no backlog).
+- O crash nativo raro nos testes no Windows (Fase 2) não apareceu nesta fase.
+
+---
+
+## Fase 4 — Voz (próxima)
+
+Escopo previsto: canais de voz com LiveKit (local via Docker em dev).
 _Plano detalhado a ser apresentado antes de começar._
 
 ---
@@ -201,6 +258,7 @@ _Plano detalhado a ser apresentado antes de começar._
 - **Fase 0:** monorepo e workspaces; ESM vs CommonJS; schema como fonte da verdade (Zod); teste de unidade vs integração; proxy de dev vs CORS; health check (liveness/readiness, 200 vs 503); CI reproduzível ("funciona na minha máquina").
 - **Fase 1:** hash de senha (argon2id) vs hash de token (SHA-256); access token vs refresh token; onde guardar token no front (memória, localStorage, cookie httpOnly; XSS e CSRF); rotação com detecção de reuso; ataques de timing e enumeração de usuários; seguro por padrão (guard global); MSW vs mock de `fetch`; teste de mutação; Web Locks e corrida entre abas.
 - **Fase 2:** paginação por cursor vs OFFSET; UUID v7; REST para escrita e WebSocket para distribuição; rooms do Socket.IO e escala horizontal (adapter Redis); UI otimista e reconciliação com `nonce`; transações; 404 vs 403; cache como fonte da tela (TanStack Query); testes instáveis (flaky) e como transformá-los em testes determinísticos; ordem dos guards no Nest.
+- **Fase 3:** presença (contagem de conexões, prazo contra "pisca"); eventos efêmeros vs persistidos; dependência circular entre módulos e como quebrar; modelagem de DM como canal (union types e o compilador apontando os casos); guards globais em HTTP vs WebSocket; open redirect; rate limit contra força bruta de códigos; testes que passam "por acaso" e como a mutação revela; testar dois usuários com origens diferentes.
 
 ---
 
@@ -212,6 +270,11 @@ _Plano detalhado a ser apresentado antes de começar._
 - Anexos, reações, busca e histórico de edições.
 - Adapter Redis do Socket.IO (várias instâncias do servidor).
 - Reordenar canais arrastando.
+- Transferir a posse de um servidor.
+- Limite de usos por convite; papéis e permissões além de dono/membro.
+- Bloquear usuário; status personalizado ("ausente", "não perturbe").
+- Notificações (navegador/desktop) para DMs e menções.
+- Investigar o crash nativo raro dos testes no Windows (ver Fase 2).
 - Recuperação de senha por e-mail.
 - Login com Google/GitHub.
 - Avatar do usuário.
