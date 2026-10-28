@@ -84,6 +84,39 @@ describe.runIf(process.env.DB_TESTS === '1')('Chat (Postgres real)', () => {
       ).toEqual(['Primeiro', 'Segundo']);
     });
 
+    it('desempata servidores com o mesmo joinedAt pela ordem de criação (id UUID v7)', async () => {
+      const prisma = app.get(PrismaService);
+      const sameMs = new Date('2026-10-28T12:00:00.000Z');
+      const older = '01a18000-0000-7000-8000-000000000001';
+      const newer = '01a18000-0000-7000-8000-000000000002';
+      // Inseridos ao contrário, para a ordem física da tabela não ajudar.
+      for (const [id, name] of [
+        [newer, 'Mais novo'],
+        [older, 'Mais antigo'],
+      ] as const) {
+        await prisma.guild.create({
+          data: {
+            id,
+            name,
+            ownerId: owner.id,
+            members: { create: { userId: owner.id, role: 'OWNER', joinedAt: sameMs } },
+          },
+        });
+      }
+
+      const res = await http(app)
+        .get('/api/guilds')
+        .set(...owner.auth)
+        .expect(200);
+
+      expect(
+        guildSchema
+          .array()
+          .parse(res.body)
+          .map((g) => g.name),
+      ).toEqual(['Mais antigo', 'Mais novo']);
+    });
+
     it('quem não é membro recebe 404, igual a um servidor que não existe', async () => {
       const guild = await createGuild();
 

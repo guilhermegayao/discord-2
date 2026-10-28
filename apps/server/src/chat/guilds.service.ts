@@ -24,7 +24,9 @@ export class GuildsService {
   async listForUser(userId: string): Promise<GuildDto[]> {
     const memberships = await this.prisma.member.findMany({
       where: { userId },
-      orderBy: { joinedAt: 'asc' },
+      // joinedAt tem precisão de milissegundo: dois servidores no mesmo ms
+      // empatariam e a ordem viraria aleatória. O id (UUID v7) desempata.
+      orderBy: [{ joinedAt: 'asc' }, { guildId: 'asc' }],
       include: { guild: true },
     });
     return memberships.map((m) => toGuildDto(m.guild));
