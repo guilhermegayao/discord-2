@@ -1,4 +1,6 @@
+import type { Track } from 'livekit-client';
 import { createContext, useContext } from 'react';
+import type { SharePreset } from './screenShare';
 
 export interface VoiceChannelRef {
   id: string;
@@ -12,6 +14,8 @@ export interface LiveParticipant {
   name: string;
   speaking: boolean;
   muted: boolean;
+  /** Compartilhando a tela agora. */
+  streaming: boolean;
   isLocal: boolean;
 }
 
@@ -32,6 +36,19 @@ export interface VoiceContextValue {
   toggleDeafen: () => Promise<void>;
   switchDevice: (kind: 'audioinput' | 'audiooutput', deviceId: string) => Promise<void>;
   dismissError: () => void;
+
+  // ---------- Compartilhamento de tela ----------
+  /** Estou transmitindo a minha tela. */
+  sharing: boolean;
+  /** A minha tela, para a miniatura de "o que estou mostrando". */
+  localScreenTrack: Track | null;
+  startShare: (preset: SharePreset) => Promise<void>;
+  stopShare: () => Promise<void>;
+  /** Quem eu estou assistindo (id), e a imagem que chega dessa pessoa. */
+  watching: string | null;
+  watchedTrack: Track | null;
+  watch: (participantId: string) => void;
+  stopWatching: () => void;
 }
 
 export const VoiceContext = createContext<VoiceContextValue | null>(null);

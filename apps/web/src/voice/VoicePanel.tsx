@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { listAudioDevices } from './livekit';
+import { ShareMenu } from './ShareMenu';
 import { useVoice } from './VoiceContext';
 
 /** Barrinha no pé da coluna de canais: estado da voz e controles. */
 export function VoicePanel() {
   const voice = useVoice();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   if (voice.status === 'idle') {
     return voice.error ? (
@@ -56,6 +58,29 @@ export function VoicePanel() {
         >
           {voice.deafened ? '🙉' : '🎧'}
         </button>
+        {voice.sharing ? (
+          <button
+            type="button"
+            className="icon-button voice-panel__live"
+            aria-label="Parar de compartilhar a tela"
+            title="Parar de compartilhar a tela"
+            onClick={() => void voice.stopShare()}
+          >
+            ⏹️
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Compartilhar tela"
+            aria-expanded={shareOpen}
+            title="Compartilhar tela"
+            disabled={voice.status !== 'connected'}
+            onClick={() => setShareOpen((o) => !o)}
+          >
+            🖥️
+          </button>
+        )}
         <button
           type="button"
           className="icon-button"
@@ -76,6 +101,13 @@ export function VoicePanel() {
         </button>
       </div>
 
+      {voice.sharing && <p className="voice-panel__sharing">🔴 Você está transmitindo a tela</p>}
+      {shareOpen && !voice.sharing && (
+        <ShareMenu
+          onStart={(preset) => void voice.startShare(preset)}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
       {settingsOpen && <DeviceSettings onSwitch={voice.switchDevice} />}
     </section>
   );

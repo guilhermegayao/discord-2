@@ -696,6 +696,160 @@ textarea:focus-visible {
   gap: 8px;
 }
 
+/* --- Compartilhamento de tela --- */
+
+.live-badge {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--down);
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.voice-panel__sharing {
+  margin: 0;
+  color: #fa777c;
+}
+
+.voice-panel__live {
+  background: rgb(242 63 67 / 0.25);
+  border-radius: 4px;
+}
+
+.share-menu {
+  display: grid;
+  gap: 8px;
+}
+
+.share-menu fieldset {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.share-menu legend {
+  margin-bottom: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.share-menu__option {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.share-menu__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.share-menu__actions button {
+  padding: 0.3rem 0.7rem;
+}
+
+.voice-room__outside {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  margin: auto;
+  padding: 16px;
+  text-align: center;
+}
+
+.voice-room__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.stage {
+  position: relative;
+  display: grid;
+  min-height: 0;
+  border-radius: 8px;
+  background: #000;
+  overflow: hidden;
+}
+
+.stage__video {
+  width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  background: #000;
+}
+
+.stage:fullscreen .stage__video {
+  max-height: 100vh;
+  height: 100%;
+}
+
+.stage__loading {
+  padding: 48px;
+  text-align: center;
+}
+
+.stage__controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgb(0 0 0 / 0.6);
+}
+
+.stage__controls span:nth-child(2) {
+  flex: 1;
+}
+
+.voice-room__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.voice-card {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 16px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+  text-align: center;
+}
+
+.voice-card--speaking {
+  box-shadow: 0 0 0 2px var(--up);
+}
+
+.voice-card__avatar {
+  width: 64px;
+  height: 64px;
+  font-size: 1.3rem;
+}
+
+.voice-card__preview {
+  width: 100%;
+  border-radius: 6px;
+  background: #000;
+}
+
+.voice-card button {
+  padding: 0.3rem 0.8rem;
+}
+
 .channel-type {
   display: flex;
   gap: 16px;

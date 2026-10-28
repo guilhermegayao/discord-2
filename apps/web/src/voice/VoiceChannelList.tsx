@@ -1,4 +1,5 @@
-import type { ChannelDto, GuildWithChannelsDto, PublicUserDto } from '@discord-2/shared';
+import type { ChannelDto, GuildWithChannelsDto, VoiceParticipantDto } from '@discord-2/shared';
+import { useNavigate } from 'react-router';
 import { initials } from '../chat/format';
 import { useDeleteChannel } from '../chat/hooks';
 import { type LiveParticipant, useVoice } from './VoiceContext';
@@ -42,14 +43,15 @@ function VoiceChannelItem({
   channel: ChannelDto;
   guildId: string;
   isOwner: boolean;
-  people: PublicUserDto[];
+  people: VoiceParticipantDto[];
 }) {
   const voice = useVoice();
+  const navigate = useNavigate();
   const deleteChannel = useDeleteChannel(guildId);
   const isHere = voice.channel?.id === channel.id && voice.status !== 'idle';
 
   // No canal em que estou, a lista vem ao vivo do LiveKit (com quem está falando);
-  // nos outros, vem do servidor (só quem está lá).
+  // nos outros, vem do servidor (quem está lá e quem transmite).
   const list: LiveParticipant[] =
     isHere && voice.status === 'connected'
       ? voice.participants
@@ -58,8 +60,15 @@ function VoiceChannelItem({
           name: p.displayName,
           speaking: false,
           muted: false,
+          streaming: p.streaming,
           isLocal: false,
         }));
+
+  // Como no Discord: clicar entra na voz e abre a página do canal (onde se assiste às telas).
+  const open = () => {
+    void voice.join({ id: channel.id, name: channel.name, guildId });
+    void navigate(`/channels/${guildId}/voice/${channel.id}`);
+  };
 
   return (
     <li className="voice-channel">
@@ -69,7 +78,7 @@ function VoiceChannelItem({
           className={`channel-link voice-channel__join${isHere ? ' active' : ''}`}
           aria-label={`Entrar no canal de voz ${channel.name}`}
           aria-current={isHere ? 'true' : undefined}
-          onClick={() => void voice.join({ id: channel.id, name: channel.name, guildId })}
+          onClick={open}
         >
           <span aria-hidden="true">🔊</span> {channel.name}
         </button>
@@ -100,6 +109,7 @@ function VoiceChannelItem({
               </span>
               <span className="voice-person__name">{p.name}</span>
               {p.speaking && <span className="sr-only">(falando)</span>}
+              {p.streaming && <span className="live-badge">AO VIVO</span>}
               {p.muted && (
                 <span className="voice-person__muted" role="img" aria-label="microfone desligado">
                   🔇

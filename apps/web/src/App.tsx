@@ -12,6 +12,7 @@ import { InvitePage } from './pages/InvitePage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { createQueryClient } from './queryClient';
+import { VoiceRoomView } from './voice/VoiceRoomView';
 
 /** O Router fica fora (main.tsx), para os testes poderem usar um MemoryRouter. */
 export function App({ queryClient }: { queryClient?: QueryClient }) {
@@ -36,6 +37,7 @@ export function App({ queryClient }: { queryClient?: QueryClient }) {
               </Route>
               <Route path="/channels/:guildId" element={<GuildLayout />}>
                 <Route index element={<GuildIndex />} />
+                <Route path="voice/:channelId" element={<VoiceRoomView />} />
                 <Route path=":channelId" element={<ChatView />} />
               </Route>
             </Route>
