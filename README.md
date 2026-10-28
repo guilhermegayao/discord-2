@@ -122,6 +122,7 @@ Detalhes e motivos no [ROADMAP.md](ROADMAP.md#fase-1--contas--27102026).
 
 ## Problemas comuns
 
+- **`npm.ps1 não pode ser carregado porque a execução de scripts foi desabilitada`** (PowerShell no Windows): use `npm.cmd` no lugar de `npm`, ou troque o terminal do VS Code para **Command Prompt** / **Git Bash** (setinha ⌄ ao lado do "+"). Outra opção é liberar scripts só para o seu usuário com `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` (muda uma configuração de segurança; decida você).
 - **`failed to connect to the docker API`**: o Docker Desktop não está aberto. Abra-o e espere o ícone ficar verde.
 - **Porta em uso**: mude a porta no `.env` (por exemplo `POSTGRES_PORT=5434`) e ajuste a `DATABASE_URL`.
 - **Banco: down na tela**: confira se o container está `healthy` com `docker compose ps`.
