@@ -12,10 +12,11 @@ const jwt = new JwtService({
   verifyOptions: { algorithms: ['HS256'] },
 });
 
-function run(opts: { authorization?: string; isPublic?: boolean }) {
+function run(opts: { authorization?: string; isPublic?: boolean; type?: 'http' | 'ws' }) {
   const req = { headers: { authorization: opts.authorization } } as AuthenticatedRequest;
   const reflector = { getAllAndOverride: () => opts.isPublic ?? false } as unknown as Reflector;
   const ctx = {
+    getType: () => opts.type ?? 'http',
     getHandler: () => undefined,
     getClass: () => undefined,
     switchToHttp: () => ({ getRequest: () => req }),
@@ -24,6 +25,10 @@ function run(opts: { authorization?: string; isPublic?: boolean }) {
 }
 
 describe('AuthGuard', () => {
+  it('não interfere em eventos do WebSocket (autenticados no handshake)', async () => {
+    await expect(run({ type: 'ws' }).result).resolves.toBe(true);
+  });
+
   it('libera rota pública sem token', async () => {
     await expect(run({ isPublic: true }).result).resolves.toBe(true);
   });

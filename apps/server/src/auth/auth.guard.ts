@@ -22,6 +22,10 @@ export class AuthGuard implements CanActivate {
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
+    // Guards globais também rodam nos handlers do WebSocket. Lá a autenticação
+    // já aconteceu no handshake (RealtimeGateway), então este guard é só HTTP.
+    if (ctx.getType() !== 'http') return true;
+
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       ctx.getHandler(),
       ctx.getClass(),
