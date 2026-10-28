@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import type { Env } from '../config/env.js';
 import { AuthController } from './auth.controller.js';
@@ -24,6 +23,9 @@ import { SessionsService } from './sessions.service.js';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, SessionsService, { provide: APP_GUARD, useClass: AuthGuard }],
+  providers: [AuthService, SessionsService, AuthGuard],
+  // O AuthGuard é registrado como guard global no AppModule (ver a ordem lá);
+  // o JwtModule é exportado para o gateway de tempo real validar tokens.
+  exports: [AuthGuard, JwtModule],
 })
 export class AuthModule {}
