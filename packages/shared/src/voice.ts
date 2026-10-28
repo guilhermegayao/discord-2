@@ -10,10 +10,17 @@ export const voiceTokenSchema = z.object({
 });
 export type VoiceTokenDto = z.infer<typeof voiceTokenSchema>;
 
+/** Alguém num canal de voz. */
+export const voiceParticipantSchema = publicUserSchema.extend({
+  /** Está compartilhando a tela agora (o 🔴 AO VIVO). */
+  streaming: z.boolean(),
+});
+export type VoiceParticipantDto = z.infer<typeof voiceParticipantSchema>;
+
 /** Quem está conectado em um canal de voz agora. */
 export const voiceChannelStateSchema = z.object({
   channelId: z.string(),
-  participants: z.array(publicUserSchema),
+  participants: z.array(voiceParticipantSchema),
 });
 export type VoiceChannelStateDto = z.infer<typeof voiceChannelStateSchema>;
 

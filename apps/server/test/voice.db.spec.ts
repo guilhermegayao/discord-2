@@ -94,13 +94,18 @@ describe.runIf(process.env.DB_TESTS === '1')('Voz (Postgres real, LiveKit simula
   });
 
   /** Envia um webhook assinado como o LiveKit faria e confere o status. */
-  async function webhook(event: string, identity?: string, room = voiceChannelId) {
+  async function webhook(
+    event: string,
+    identity?: string,
+    trackSource?: 'MICROPHONE' | 'SCREEN_SHARE' | 'SCREEN_SHARE_AUDIO',
+  ) {
     const body = JSON.stringify({
       event,
       id: `evt-${Math.random()}`,
       createdAt: String(Math.floor(Date.now() / 1000)),
-      room: { name: room },
+      room: { name: voiceChannelId },
       ...(identity && { participant: { identity } }),
+      ...(trackSource && { track: { sid: 'TR_1', source: trackSource } }),
     });
     const signer = new AccessToken(KEY, SECRET);
     signer.sha256 = createHash('sha256').update(body).digest('base64');
@@ -142,7 +147,7 @@ describe.runIf(process.env.DB_TESTS === '1')('Voz (Postgres real, LiveKit simula
   });
 
   describe('token', () => {
-    it('membro recebe um token só para esta sala, só com microfone', async () => {
+    it('membro recebe um token só para esta sala: microfone e tela, sem câmera', async () => {
       const res = await http(app)
         .post(`/api/channels/${voiceChannelId}/voice-token`)
         .set(...friend.auth)
@@ -159,7 +164,7 @@ describe.runIf(process.env.DB_TESTS === '1')('Voz (Postgres real, LiveKit simula
         canPublish: true,
         canSubscribe: true,
         canPublishData: false,
-        canPublishSources: ['microphone'],
+        canPublishSources: ['microphone', 'screen_share', 'screen_share_audio'],
       });
       // Sem permissões de administração da sala
       expect(claims.video?.roomAdmin).toBeFalsy();
@@ -222,7 +227,9 @@ describe.runIf(process.env.DB_TESTS === '1')('Voz (Postgres real, LiveKit simula
       expect(joined).toEqual({
         guildId,
         channelId: voiceChannelId,
-        participants: [{ id: friend.id, username: 'amigo', displayName: 'amigo' }],
+        participants: [
+          { id: friend.id, username: 'amigo', displayName: 'amigo', streaming: false },
+        ],
       });
       expect(await voiceStates()).toEqual([
         { channelId: voiceChannelId, participants: joined.participants },
@@ -258,6 +265,47 @@ describe.runIf(process.env.DB_TESTS === '1')('Voz (Postgres real, LiveKit simula
       await webhook('room_finished');
 
       expect(await voiceStates()).toEqual([]);
+    });
+
+    it('começar e parar de compartilhar a tela liga e desliga o "ao vivo"', async () => {
+      await webhook('participant_joined', friend.id);
+      const ownerSocket = await kit.connectReady(owner.token);
+
+      const [live] = await Promise.all([
+        next(ownerSocket, 'voice:state'),
+        webhook('track_published', friend.id, 'SCREEN_SHARE'),
+      ]);
+      expect(live.participants).toEqual([
+        expect.objectContaining({ id: friend.id, streaming: true }),
+      ]);
+      expect((await voiceStates())[0]?.participants[0]?.streaming).toBe(true);
+
+      const [ended] = await Promise.all([
+        next(ownerSocket, 'voice:state'),
+        webhook('track_unpublished', friend.id, 'SCREEN_SHARE'),
+      ]);
+      expect(ended.participants[0]?.streaming).toBe(false);
+    });
+
+    it('microfone e áudio da tela não contam como "ao vivo" (sem evento)', async () => {
+      await webhook('participant_joined', friend.id);
+      const ownerSocket = await kit.connectReady(owner.token);
+      const nothing = expectNothing(ownerSocket, 'voice:state');
+
+      await webhook('track_published', friend.id, 'MICROPHONE');
+      await webhook('track_published', friend.id, 'SCREEN_SHARE_AUDIO');
+
+      await nothing;
+      expect((await voiceStates())[0]?.participants[0]?.streaming).toBe(false);
+    });
+
+    it('entrada repetida não apaga o "ao vivo" de quem já estava', async () => {
+      await webhook('participant_joined', friend.id);
+      await webhook('track_published', friend.id, 'SCREEN_SHARE');
+
+      await webhook('participant_joined', friend.id);
+
+      expect((await voiceStates())[0]?.participants[0]?.streaming).toBe(true);
     });
 
     it('quem é de fora não consulta o estado de voz (404)', async () => {

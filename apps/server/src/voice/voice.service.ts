@@ -57,7 +57,12 @@ export class VoiceService implements OnApplicationBootstrap {
       canSubscribe: true,
       canPublish: true,
       canPublishData: false,
-      canPublishSources: [TrackSource.MICROPHONE],
+      // Voz + compartilhamento de tela (com o áudio dela). Câmera, não.
+      canPublishSources: [
+        TrackSource.MICROPHONE,
+        TrackSource.SCREEN_SHARE,
+        TrackSource.SCREEN_SHARE_AUDIO,
+      ],
     });
 
     return { url: this.livekit.url, token: await token.toJwt() };
@@ -95,6 +100,14 @@ export class VoiceService implements OnApplicationBootstrap {
       case 'room_finished':
         this.emitState(this.registry.clear(channelId), channelId);
         break;
+      // Começou/parou de compartilhar a tela: liga/desliga o 🔴 AO VIVO.
+      case 'track_published':
+      case 'track_unpublished':
+        if (userId && event.track?.source === TrackSource.SCREEN_SHARE) {
+          const streaming = event.event === 'track_published';
+          this.emitState(this.registry.setStreaming(channelId, userId, streaming), channelId);
+        }
+        break;
       default:
         break;
     }
@@ -129,7 +142,10 @@ export class VoiceService implements OnApplicationBootstrap {
       const rooms = await this.livekit.rooms.listRooms();
       for (const room of rooms) {
         const participants = await this.livekit.rooms.listParticipants(room.name);
-        for (const p of participants) await this.trackJoin(room.name, p.identity, false);
+        for (const p of participants) {
+          const streaming = p.tracks.some((t) => t.source === TrackSource.SCREEN_SHARE);
+          await this.trackJoin(room.name, p.identity, false, streaming);
+        }
       }
       this.logger.log(`voz sincronizada com o LiveKit (${rooms.length} salas)`);
     } catch (err) {
@@ -137,7 +153,12 @@ export class VoiceService implements OnApplicationBootstrap {
     }
   }
 
-  private async trackJoin(channelId: string, userId: string, emit = true): Promise<void> {
+  private async trackJoin(
+    channelId: string,
+    userId: string,
+    emit = true,
+    streaming = false,
+  ): Promise<void> {
     const channel = await this.prisma.channel
       .findUnique({ where: { id: channelId }, select: { guildId: true, type: true } })
       .catch(() => null); // nome de sala que não é um UUID nosso
@@ -153,7 +174,7 @@ export class VoiceService implements OnApplicationBootstrap {
       return;
     }
 
-    this.registry.join(channelId, channel.guildId, member.user);
+    this.registry.join(channelId, channel.guildId, member.user, streaming);
     if (emit) this.emitState(channel.guildId, channelId);
   }
 
