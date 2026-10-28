@@ -1,0 +1,23 @@
+{
+  "name": "@discord-2/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "discord-2 para Windows (Electron)",
+  "author": "Guilherme",
+  "type": "commonjs",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json && electron .",
+    "dist": "tsc -p tsconfig.build.json && electron-builder --win --publish never",
+    "icon": "node scripts/make-icon.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "electron": "44.9.3",
+    "electron-builder": "26.17.0",
+    "vitest": "^5.0.5"
+  }
+}

@@ -4,6 +4,9 @@ build/
 coverage/
 *.tsbuildinfo
 
+# Instaladores gerados pelo electron-builder
+apps/desktop/release/
+
 # Cliente gerado pelo Prisma (recriado com `prisma generate`)
 apps/server/src/generated/
 
