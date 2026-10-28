@@ -20,6 +20,9 @@ model User {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
   sessions     Session[]
+  ownedGuilds  Guild[]
+  memberships  Member[]
+  messages     Message[]
 
   @@map("users")
 }
@@ -42,4 +45,72 @@ model Session {
   @@index([familyId])
   @@index([userId])
   @@map("sessions")
+}
+
+/// "Servidor" na interface. No código usamos Guild para não confundir
+/// com o servidor backend (é o mesmo nome que o Discord usa na API).
+model Guild {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  name      String
+  ownerId   String    @map("owner_id") @db.Uuid
+  owner     User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now()) @map("created_at")
+  members   Member[]
+  channels  Channel[]
+
+  @@index([ownerId])
+  @@map("guilds")
+}
+
+enum MemberRole {
+  OWNER
+  MEMBER
+}
+
+model Member {
+  guildId  String     @map("guild_id") @db.Uuid
+  guild    Guild      @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  userId   String     @map("user_id") @db.Uuid
+  user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     MemberRole @default(MEMBER)
+  joinedAt DateTime   @default(now()) @map("joined_at")
+
+  @@id([guildId, userId])
+  /// "Meus servidores" consulta por usuário
+  @@index([userId])
+  @@map("members")
+}
+
+enum ChannelType {
+  TEXT
+}
+
+model Channel {
+  id        String      @id @default(uuid(7)) @db.Uuid
+  guildId   String      @map("guild_id") @db.Uuid
+  guild     Guild       @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  name      String
+  type      ChannelType @default(TEXT)
+  position  Int
+  createdAt DateTime    @default(now()) @map("created_at")
+  messages  Message[]
+
+  @@index([guildId, position])
+  @@map("channels")
+}
+
+model Message {
+  /// UUID v7: ordenado por tempo, serve de cursor para a paginação
+  id        String    @id @default(uuid(7)) @db.Uuid
+  channelId String    @map("channel_id") @db.Uuid
+  channel   Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  authorId  String    @map("author_id") @db.Uuid
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content   String    @db.VarChar(2000)
+  createdAt DateTime  @default(now()) @map("created_at")
+  editedAt  DateTime? @map("edited_at")
+
+  /// Histórico do canal: "as N mais novas antes do id X"
+  @@index([channelId, id(sort: Desc)])
+  @@map("messages")
 }
