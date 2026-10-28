@@ -17,7 +17,10 @@ export class VoiceRegistry {
   private readonly rooms = new Map<string, VoiceRoom>();
 
   join(channelId: string, guildId: string, user: PublicUserDto, streaming = false): void {
-    const room = this.rooms.get(channelId) ?? { guildId, participants: new Map() };
+    const room: VoiceRoom = this.rooms.get(channelId) ?? {
+      guildId,
+      participants: new Map<string, VoiceParticipantDto>(),
+    };
     // Entrada repetida (webhook duplicado) não apaga o "transmitindo" de quem já estava.
     const previous = room.participants.get(user.id);
     room.participants.set(user.id, {
