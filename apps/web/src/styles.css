@@ -779,7 +779,9 @@ textarea:focus-visible {
 .stage {
   position: relative;
   display: grid;
-  min-height: 0;
+  /* Não encolher: em janela grande o vídeo é alto, e encolher o palco
+     cortava a barra de controles (tela cheia, parar de assistir). */
+  flex-shrink: 0;
   border-radius: 8px;
   background: #000;
   overflow: hidden;
@@ -787,7 +789,8 @@ textarea:focus-visible {
 
 .stage__video {
   width: 100%;
-  max-height: 70vh;
+  /* Cabe na janela junto com o cabeçalho, a barra de controles e os cartões. */
+  max-height: max(240px, calc(100dvh - 330px));
   object-fit: contain;
   background: #000;
 }
