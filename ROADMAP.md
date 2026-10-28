@@ -251,6 +251,17 @@ _Plano detalhado a ser apresentado antes de começar._
 
 ---
 
+## Decisões já tomadas para fases futuras
+
+- **Fase 7: hospedar o próprio LiveKit numa VM gratuita** (decidido em 28/10/2026), em vez de depender do LiveKit Cloud.
+  - Motivo: o plano gratuito do LiveKit Cloud tem cerca de 50 GB/mês de banda de saída, e **compartilhar tela consome isso rápido**.
+  - Candidata: camada _Always Free_ da Oracle Cloud (VM ARM, muito tráfego de saída). **Conferir limites e regras na hora**: pede cartão no cadastro, só para verificação.
+  - A VM vai precisar de domínio/subdomínio, HTTPS e o TURN embutido do LiveKit. O servidor Nest e o Postgres podem ficar na mesma VM.
+  - Consequência para a Fase 4: a configuração do LiveKit (`livekit.yaml`, chaves, portas, webhook) é feita para ser levada para a VM, toda via variáveis de ambiente.
+- **Fase 8: compartilhamento de tela no iPhone** provavelmente exigirá o Apple Developer Program (pago, anual). Confirmar valores e alternativas antes de começar.
+
+---
+
 ## Tópicos para estudo (explicação completa no fim do projeto)
 
 > A pedido do Guilherme, os tópicos de estudo/entrevista são guardados aqui e explicados todos juntos quando o projeto terminar.
