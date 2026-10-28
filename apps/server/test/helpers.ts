@@ -1,3 +1,4 @@
+import { authResponseSchema } from '@discord-2/shared';
 import type { INestApplication } from '@nestjs/common';
 import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import type { Server } from 'node:http';
@@ -29,6 +30,32 @@ export const newUser = {
   displayName: 'Guilherme',
   password: 'senha-forte-123',
 };
+
+export interface TestUser {
+  id: string;
+  token: string;
+  /** Header pronto: `.set(...auth(user))` */
+  auth: ['Authorization', string];
+}
+
+/** Cadastra um usuário e devolve id + access token. */
+export async function signUp(app: INestApplication, username: string): Promise<TestUser> {
+  const res = await http(app)
+    .post('/api/auth/register')
+    .send({
+      email: `${username}@example.com`,
+      username,
+      displayName: username,
+      password: 'senha-forte-123',
+    })
+    .expect(201);
+  const body = authResponseSchema.parse(res.body);
+  return {
+    id: body.user.id,
+    token: body.accessToken,
+    auth: ['Authorization', `Bearer ${body.accessToken}`],
+  };
+}
 
 /** Extrai o valor do cookie de refresh do header Set-Cookie. */
 export function refreshCookie(res: request.Response): string | undefined {
