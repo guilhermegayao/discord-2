@@ -1,6 +1,8 @@
 node_modules/
 dist/
 build/
+# Recursos do instalador (ícone) ficam versionados
+!apps/desktop/build/
 coverage/
 *.tsbuildinfo
 

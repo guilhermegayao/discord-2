@@ -29,7 +29,12 @@ export default tseslint.config(
     },
   },
   {
-    files: ['apps/server/**/*.ts', 'packages/**/*.ts', '**/*.config.{ts,mjs}'],
+    files: [
+      'apps/server/**/*.ts',
+      'packages/**/*.ts',
+      'apps/desktop/**/*.{ts,mjs}',
+      '**/*.config.{ts,mjs}',
+    ],
     languageOptions: { globals: globals.node },
   },
   {
