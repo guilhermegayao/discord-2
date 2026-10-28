@@ -13,7 +13,7 @@ App de chat, voz e **compartilhamento de tela** no estilo Discord, feito para us
 | Web           | React 19, Vite 8, TanStack Query, React Router, livekit-client, TypeScript           |
 | Compartilhado | `@discord-2/shared`: schemas Zod, tipos e eventos do socket usados por todos os apps |
 | Qualidade     | Vitest, Testing Library, MSW, supertest, ESLint, Prettier, GitHub Actions            |
-| Em breve      | Compartilhamento de tela, Electron (desktop), Expo (mobile)                          |
+| Em breve      | Electron (desktop), Expo (mobile)                                                    |
 
 ## O que já funciona
 
@@ -27,6 +27,7 @@ App de chat, voz e **compartilhamento de tela** no estilo Discord, feito para us
 - "**Fulano está digitando…**"
 - **Mensagens diretas** entre quem divide um servidor.
 - **Canais de voz**: veja quem está em cada um e quem está falando, com mutar, ensurdecer e escolha de microfone. A voz continua conectada enquanto você navega.
+- **Compartilhamento de tela** dentro da voz, com três qualidades (Vídeo/jogo, Texto/código, Economia) e áudio da aba ou do sistema (Chrome/Edge). Quem quer assistir clica em "Assistir", com tela cheia. Quem não assiste não gasta internet com a imagem.
 
 ### Testar com duas contas no mesmo navegador
 

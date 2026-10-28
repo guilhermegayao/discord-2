@@ -17,8 +17,8 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 | 2    | Servidores e chat: canais de texto, mensagens em tempo real, paginação    | ✅ Concluída |
 | 3    | Social: convites, membros, presença, "digitando...", DMs                  | ✅ Concluída |
 | 4    | Voz com LiveKit                                                           | ✅ Concluída |
-| 5    | Compartilhamento de tela no navegador (getDisplayMedia)                   | ⏳ Próxima   |
-| 6    | App desktop Electron: seletor de tela/janela, áudio do sistema, `.exe`    | —            |
+| 5    | Compartilhamento de tela no navegador (getDisplayMedia)                   | ✅ Concluída |
+| 6    | App desktop Electron: seletor de tela/janela, áudio do sistema, `.exe`    | ⏳ Próxima   |
 | 7    | Deploy gratuito (back, banco, LiveKit Cloud)                              | —            |
 | 8    | Mobile com Expo (incluindo tela no iOS via ReplayKit/Broadcast Extension) | —            |
 
@@ -302,9 +302,57 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 
 ---
 
-## Fase 5 — Compartilhamento de tela no navegador (próxima)
+## Fase 5 — Compartilhamento de tela no navegador ✅ (28/10/2026)
 
-Escopo previsto: compartilhar tela pelo navegador (`getDisplayMedia`) dentro do canal de voz, com qualidade configurável.
+### O que foi feito
+
+- **Servidor**:
+  - O token de voz passa a permitir `screen_share` e `screen_share_audio` (ainda sem câmera).
+  - Os webhooks `track_published`/`track_unpublished` da tela ligam e desligam um **🔴 "ao vivo"** no estado de voz, então **quem está fora da chamada também vê quem transmite**.
+  - A sincronização ao subir recupera esse estado do LiveKit.
+- **Web**:
+  - **Botão 🖥️ "Compartilhar tela"** no painel de voz, com três qualidades (todas em `apps/web/src/voice/screenShare.ts`):
+    - **Vídeo/jogo (padrão)**: 1080p a 30 fps, `contentHint: motion`, até 4 Mbps;
+    - **Texto/código**: 1080p até 15 fps, `contentHint: detail`, até 2,5 Mbps;
+    - **Economia**: 720p a 15 fps, até 1,2 Mbps.
+  - Cada qualidade envia também uma **camada menor** (simulcast) para quem tem internet ruim.
+  - Áudio da aba (Chrome/Edge) ou do sistema ao compartilhar a tela inteira (Windows). A própria aba do app não aparece no seletor, evitando o "espelho infinito".
+  - **Página do canal de voz** (`/channels/:guildId/voice/:channelId`): cartões de quem está na sala, 🔴 AO VIVO, botão **Assistir** e a tela grande com **tela cheia**. Mostra também uma miniatura da **sua** transmissão.
+  - **Assistir é opcional**: o app conecta com `autoSubscribe: false` e só recebe a tela (e o áudio dela) de quem você escolheu assistir. A voz de todos chega sempre.
+  - Detecta o botão "Parar compartilhamento" do próprio navegador e quando quem você assiste para. Fechar o seletor sem escolher não mostra erro.
+- **Testes (245 no total)**:
+  - shared: 31;
+  - server: 121, com 3 novos do "ao vivo" pelo webhook;
+  - web: 93, com 11 novos de transmissão: qualidades, assistir opcional, paradas, cancelar, sem suporte, tela cheia.
+- **Testado no navegador**: clicar no canal de voz entra e abre a página dele; o menu de qualidade abre com "Vídeo/jogo" marcado; ao pedir a tela, o navegador embutido do app **bloqueou a captura** (ele não captura tela nem microfone) e o app tratou isso sem erro. **A captura e a imagem são conferidas por você no Chrome/Edge.**
+
+### Decisões tomadas
+
+| Decisão                                     | Motivo                                                                                                                            |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Assistir opcional** (assinatura manual)   | É o que mais pesa na banda: cada pessoa assistindo a 1080p30 recebe vários Mbps. Isso importa muito para a VM gratuita da Fase 7. |
+| **Qualidade padrão "Vídeo/jogo"**           | Escolha do Guilherme: o grupo vai compartilhar mais jogos.                                                                        |
+| **Números de qualidade num arquivo só**     | O refinamento de qualidade fica para o fim do projeto; tudo está em `screenShare.ts`.                                             |
+| **🔴 pelo webhook do servidor**             | Quem está fora da voz também precisa saber que alguém está ao vivo, e só o servidor recebe esse aviso para todos.                 |
+| **Áudio da tela pelo mesmo caminho da voz** | Respeita o ensurdecer e a escolha de saída de áudio. O `<video>` fica mudo.                                                       |
+
+### Imprevistos encontrados
+
+- **Um commit entrou com erro de lint**: um `new Map()` sem tipo virou `Map<any, any>`. Corrigido num commit de ajuste. Desde então, o comando de commit **só roda se lint e tipos passarem**.
+- O lint pegou `navigator.mediaDevices.getDisplayMedia` sendo passado como valor (método solto); a checagem passou a ser um `typeof`.
+- A sala falsa dos testes passou a simular **publicações** (fonte + `setSubscribed`), para testar que a tela só é recebida ao assistir. Confirmado com teste de mutação.
+
+### Pendências e observações
+
+- **Teste com você**: duas contas, uma compartilha (aba com vídeo para testar o áudio, ou a tela inteira) e a outra assiste.
+- Compartilhar uma **janela** não leva o áudio dela em nenhum navegador → Fase 6 (Electron).
+- Firefox compartilha sem áudio; o Safari assiste normalmente.
+
+---
+
+## Fase 6 — App desktop Electron (próxima)
+
+Escopo previsto: empacotar o web como app desktop, com seletor próprio de tela/janela, áudio do sistema e instalador `.exe`.
 _Plano detalhado a ser apresentado antes de começar._
 
 ---
@@ -329,6 +377,7 @@ _Plano detalhado a ser apresentado antes de começar._
 - **Fase 2:** paginação por cursor vs OFFSET; UUID v7; REST para escrita e WebSocket para distribuição; rooms do Socket.IO e escala horizontal (adapter Redis); UI otimista e reconciliação com `nonce`; transações; 404 vs 403; cache como fonte da tela (TanStack Query); testes instáveis (flaky) e como transformá-los em testes determinísticos; ordem dos guards no Nest.
 - **Fase 3:** presença (contagem de conexões, prazo contra "pisca"); eventos efêmeros vs persistidos; dependência circular entre módulos e como quebrar; modelagem de DM como canal (union types e o compilador apontando os casos); guards globais em HTTP vs WebSocket; open redirect; rate limit contra força bruta de códigos; testes que passam "por acaso" e como a mutação revela; testar dois usuários com origens diferentes.
 - **Fase 4:** WebRTC e por que um SFU (LiveKit) em vez de P2P; token de acesso com permissões (grants); webhooks assinados e verificação sobre o corpo cru; fonte da verdade (servidor de mídia) vs. estado derivado; UDP/TCP, ICE e o IP anunciado; refs vs. estado no React; dublês de bibliotecas de mídia nos testes.
+- **Fase 5:** `getDisplayMedia` e limites por navegador; simulcast e adaptive stream; `contentHint` (motion vs detail); taxa de bits vs resolução vs fps; assinatura seletiva de faixas para economizar banda; Fullscreen API.
 
 ---
 
@@ -345,6 +394,8 @@ _Plano detalhado a ser apresentado antes de começar._
 - Bloquear usuário; status personalizado ("ausente", "não perturbe").
 - Notificações (navegador/desktop) para DMs e menções.
 - Investigar o crash nativo raro dos testes no Windows (ver Fase 2).
+- **Refinamento de qualidade no fim do projeto** (pedido do Guilherme): ajustar voz (codec, supressão de ruído, ganho) e compartilhamento de tela (resolução, fps, taxa de bits por qualidade, codec como VP9/AV1), medindo com uso real.
+- Tela: "quem está assistindo"/contador de espectadores, _picture-in-picture_, desenhar sobre a tela, gravação.
 - Voz: _push-to-talk_, volume individual por pessoa, câmera, chat de texto dentro do canal de voz.
 - Testar voz com um amigo no mesmo Wi-Fi (`LIVEKIT_NODE_IP` = IP da rede local + `vite --host`).
 - Recuperação de senha por e-mail.
