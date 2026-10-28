@@ -89,12 +89,16 @@ export const guildWithChannelsSchema = guildSchema.extend({
 });
 export type GuildWithChannelsDto = z.infer<typeof guildWithChannelsSchema>;
 
-export const messageAuthorSchema = z.object({
+/** Dados públicos de um usuário (nunca e-mail). */
+export const publicUserSchema = z.object({
   id: z.string(),
   username: z.string(),
   displayName: z.string(),
 });
-export type MessageAuthorDto = z.infer<typeof messageAuthorSchema>;
+export type PublicUserDto = z.infer<typeof publicUserSchema>;
+
+export const messageAuthorSchema = publicUserSchema;
+export type MessageAuthorDto = PublicUserDto;
 
 export const messageSchema = z.object({
   id: z.string(),
@@ -116,6 +120,66 @@ export const messagePageSchema = z.object({
 });
 export type MessagePageDto = z.infer<typeof messagePageSchema>;
 
+// ---------- Membros ----------
+
+export const memberRoleSchema = z.enum(['OWNER', 'MEMBER']);
+
+export const memberSchema = z.object({
+  user: publicUserSchema,
+  role: memberRoleSchema,
+  joinedAt: z.iso.datetime(),
+  /** Tem pelo menos uma aba/dispositivo conectado agora. */
+  online: z.boolean(),
+});
+export type MemberDto = z.infer<typeof memberSchema>;
+
+// ---------- Convites ----------
+
+export const INVITE_EXPIRATIONS = ['1d', '7d', 'never'] as const;
+export type InviteExpiration = (typeof INVITE_EXPIRATIONS)[number];
+
+export const createInviteSchema = z.object({
+  expiresIn: z.enum(INVITE_EXPIRATIONS).default('7d'),
+});
+export type CreateInviteInput = z.input<typeof createInviteSchema>;
+export type CreateInviteData = z.output<typeof createInviteSchema>;
+
+export const inviteSchema = z.object({
+  code: z.string(),
+  guildId: z.string(),
+  creator: publicUserSchema,
+  uses: z.number().int().nonnegative(),
+  expiresAt: z.iso.datetime().nullable(),
+  createdAt: z.iso.datetime(),
+});
+export type InviteDto = z.infer<typeof inviteSchema>;
+
+/** O que quem recebeu o link vê antes de aceitar. */
+export const invitePreviewSchema = z.object({
+  code: z.string(),
+  guild: z.object({ id: z.string(), name: z.string() }),
+  memberCount: z.number().int(),
+  expiresAt: z.iso.datetime().nullable(),
+  alreadyMember: z.boolean(),
+});
+export type InvitePreviewDto = z.infer<typeof invitePreviewSchema>;
+
+// ---------- Mensagens diretas ----------
+
+export const openDmSchema = z.object({ userId: z.uuid() });
+export type OpenDmData = z.output<typeof openDmSchema>;
+
+export const dmChannelSchema = z.object({
+  id: z.string(),
+  type: z.literal('DM'),
+  /** A outra pessoa da conversa (do ponto de vista de quem pediu). */
+  recipient: publicUserSchema,
+  createdAt: z.iso.datetime(),
+  /** Quando foi a última mensagem; null se ainda não houve nenhuma. */
+  lastMessageAt: z.iso.datetime().nullable(),
+});
+export type DmChannelDto = z.infer<typeof dmChannelSchema>;
+
 // ---------- Eventos em tempo real (Socket.IO) ----------
 
 export interface MessageDeletedEvent {
@@ -132,6 +196,26 @@ export interface GuildDeletedEvent {
   id: string;
 }
 
+export interface MemberJoinedEvent {
+  guildId: string;
+  member: MemberDto;
+}
+
+export interface MemberLeftEvent {
+  guildId: string;
+  userId: string;
+}
+
+export interface PresenceEvent {
+  userId: string;
+  online: boolean;
+}
+
+export interface TypingEvent {
+  channelId: string;
+  user: PublicUserDto;
+}
+
 /**
  * Eventos que o servidor emite. Servidor e web usam esta mesma interface,
  * então um evento com nome ou formato errado não compila.
@@ -146,7 +230,22 @@ export interface ServerToClientEvents {
   'guild:created': (guild: GuildWithChannelsDto) => void;
   'guild:updated': (guild: GuildDto) => void;
   'guild:deleted': (event: GuildDeletedEvent) => void;
+  /** Só para quem saiu ou foi expulso: o servidor some da lista dele. */
+  'guild:removed': (event: GuildDeletedEvent) => void;
+  'member:joined': (event: MemberJoinedEvent) => void;
+  'member:left': (event: MemberLeftEvent) => void;
+  'presence:update': (event: PresenceEvent) => void;
+  typing: (event: TypingEvent) => void;
+  'dm:created': (dm: DmChannelDto) => void;
 }
 
-/** O cliente não envia eventos: toda escrita passa pela API REST. */
-export type ClientToServerEvents = Record<string, never>;
+export const typingStartSchema = z.object({ channelId: z.uuid() });
+export type TypingStartData = z.output<typeof typingStartSchema>;
+
+/**
+ * Eventos que o cliente envia. Só dados efêmeros passam por aqui;
+ * tudo que é gravado no banco continua indo pela API REST.
+ */
+export interface ClientToServerEvents {
+  'typing:start': (data: TypingStartData) => void;
+}
