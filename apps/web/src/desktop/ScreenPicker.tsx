@@ -69,6 +69,17 @@ export function ScreenPicker() {
           </ul>
         )}
 
+        {tab === 'window' && (
+          // Jogo em tela cheia exclusiva se minimiza ao clicar aqui, e o Windows
+          // não lista (nem desenha) janelas minimizadas.
+          <p className="muted picker__note">
+            🎮 Não achou o jogo? Janelas minimizadas não aparecem, e jogos em tela cheia se
+            minimizam quando você clica aqui. No jogo, mude o modo de vídeo para{' '}
+            <strong>Janela sem bordas</strong> (ou &quot;Tela cheia em janela&quot;), ou compartilhe
+            a tela inteira na aba Telas.
+          </p>
+        )}
+
         <p className="muted picker__note">
           🔇 O áudio do sistema ainda não vai junto no app (chega na próxima versão). Para
           transmitir com som agora, use o navegador e compartilhe uma aba.

@@ -135,6 +135,18 @@ describe('<ScreenPicker /> (app desktop)', () => {
     expect(bridge.respondScreenPicker).toHaveBeenCalledWith('pick-3', 'window:9:0');
   });
 
+  it('na aba de janelas, explica o que fazer quando o jogo não aparece', async () => {
+    const user = userEvent.setup();
+    const { open } = installBridge();
+    render(<ScreenPicker />);
+    open(request);
+
+    expect(screen.queryByText(/Não achou o jogo/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Janelas' }));
+
+    expect(screen.getByText(/Não achou o jogo/)).toHaveTextContent('Janela sem bordas');
+  });
+
   it('avisa que o áudio do sistema ainda não vai junto no app', () => {
     const { open } = installBridge();
     render(<ScreenPicker />);

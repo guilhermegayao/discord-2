@@ -387,6 +387,9 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 
 - O `npm install` num workspace novo não salvou as dependências na primeira vez (de novo); rodar outra vez resolveu.
 - `import.meta` não existe em CommonJS: os testes do desktop usam `__dirname`.
+- **O jogo não aparecia no seletor** (teste do Guilherme com The Last of Us Part II):
+  - Primeiro suspeito: o seletor escondia janelas sem miniatura. Elas passaram a aparecer com "Sem prévia", mas o jogo continuou fora da lista.
+  - Causa real: em **tela cheia exclusiva**, o jogo se minimiza ao perder o foco, e o Chromium não lista janelas minimizadas (o Windows nem as desenha). Resolvido no jogo, no modo janela/sem bordas. A aba Janelas agora explica isso.
 - O `.gitignore` ignorava qualquer pasta `build/`, inclusive a do ícone do instalador; ganhou uma exceção para `apps/desktop/build/`.
 
 ### Pendências e observações
