@@ -15,14 +15,19 @@ export function formatTimestamp(iso: string, now = new Date()): string {
     : dateTimeFormat.format(date);
 }
 
-/** Iniciais para o "ícone" de servidor/avatar: "Os Amigos" → "OA". */
+/**
+ * Iniciais para o "ícone" de servidor/avatar: "Os Amigos" → "OA".
+ * Usa a primeira letra ou número de cada palavra, ignorando pontuação:
+ * "Ana (teste)" → "AT", e não "A(".
+ */
 export function initials(name: string): string {
   return (
     name
       .split(/\s+/)
+      .map((word) => word.match(/[\p{L}\p{N}]/u)?.[0])
       .filter(Boolean)
       .slice(0, 2)
-      .map((word) => word[0]?.toUpperCase())
-      .join('') || '?'
+      .join('')
+      .toUpperCase() || '?'
   );
 }
