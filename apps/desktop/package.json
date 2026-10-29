@@ -9,8 +9,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc -p tsconfig.build.json && electron .",
-    "dist": "tsc -p tsconfig.build.json && electron-builder --win --publish never",
+    "dist": "tsc -p tsconfig.build.json && npm run native && electron-builder --win --publish never",
     "icon": "node scripts/make-icon.mjs",
+    "native": "node-gyp rebuild --directory native",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -23,8 +24,13 @@
     },
     "files": [
       "dist/**/*.js",
+      "native/build/Release/loopback.node",
       "package.json"
     ],
+    "asarUnpack": [
+      "native/build/Release/loopback.node"
+    ],
+    "npmRebuild": false,
     "win": {
       "target": "nsis",
       "icon": "build/icon.png",
@@ -42,6 +48,8 @@
     "@types/node": "^24.19.2",
     "electron": "44.9.3",
     "electron-builder": "26.17.0",
+    "node-addon-api": "^8.9.2",
+    "node-gyp": "^12.4.0",
     "vitest": "^5.0.5"
   }
 }

@@ -82,6 +82,11 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      # Módulo C++ do som do PC (o runner do Windows já tem o Visual Studio).
+      - name: Compilar módulo nativo
+        run: npm run native -w @discord-2/desktop
+
+      # Com o .node compilado, o teste de fumaça do módulo também roda.
       - name: Testes do app desktop
         run: npm run build -w @discord-2/shared && npm test -w @discord-2/desktop
 
