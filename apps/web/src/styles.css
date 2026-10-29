@@ -938,6 +938,13 @@ textarea:focus-visible {
   height: 16px;
 }
 
+.picker__audio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
 .picker__note {
   margin: 0;
   font-size: 0.8rem;

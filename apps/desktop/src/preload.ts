@@ -11,6 +11,8 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 
 const PICKER_REQUEST = 'screen-picker:request';
 const PICKER_RESPONSE = 'screen-picker:response';
+const SYSTEM_AUDIO_PORT = 'system-audio:port';
+const SYSTEM_AUDIO_MESSAGE = 'discord-2:system-audio';
 
 const bridge: DesktopBridge = {
   platform: process.platform,
@@ -21,9 +23,15 @@ const bridge: DesktopBridge = {
       ipcRenderer.removeListener(PICKER_REQUEST, handler);
     };
   },
-  respondScreenPicker(requestId, sourceId) {
-    ipcRenderer.send(PICKER_RESPONSE, requestId, sourceId);
+  respondScreenPicker(requestId, sourceId, includeAudio) {
+    ipcRenderer.send(PICKER_RESPONSE, requestId, sourceId, includeAudio);
   },
 };
 
 contextBridge.exposeInMainWorld('desktop', bridge);
+
+// O som do PC chega por um MessagePort, que não atravessa o contextBridge:
+// repassamos para a página como mensagem da própria janela, só para a origem dela.
+ipcRenderer.on(SYSTEM_AUDIO_PORT, (event: IpcRendererEvent) => {
+  window.postMessage({ type: SYSTEM_AUDIO_MESSAGE }, window.location.origin, event.ports);
+});

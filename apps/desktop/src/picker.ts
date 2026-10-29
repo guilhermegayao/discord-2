@@ -35,9 +35,15 @@ export function toPickerSources(
     .sort((a, b) => rank(a) - rank(b));
 }
 
+/** O que o usuário escolheu no seletor. */
+export interface PickerChoice {
+  sourceId: string;
+  includeAudio: boolean;
+}
+
 interface Pending {
   allowed: Set<string>;
-  resolve: (sourceId: string | null) => void;
+  resolve: (choice: PickerChoice | null) => void;
   timer: NodeJS.Timeout;
 }
 
@@ -52,8 +58,11 @@ export class PickerBroker {
 
   constructor(private readonly timeoutMs = 2 * 60_000) {}
 
-  /** Abre um pedido; `send` entrega o pedido à página. Resolve com o id escolhido ou null. */
-  request(sources: PickerSource[], send: (requestId: string) => void): Promise<string | null> {
+  /** Abre um pedido; `send` entrega o pedido à página. Resolve com a escolha ou null. */
+  request(
+    sources: PickerSource[],
+    send: (requestId: string) => void,
+  ): Promise<PickerChoice | null> {
     const requestId = `pick-${++this.counter}`;
     return new Promise((resolve) => {
       const timer = setTimeout(() => this.respond(requestId, null), this.timeoutMs);
@@ -62,12 +71,14 @@ export class PickerBroker {
     });
   }
 
-  respond(requestId: string, sourceId: string | null): void {
+  respond(requestId: string, sourceId: string | null, includeAudio = false): void {
     const entry = this.pending.get(requestId);
     if (!entry) return;
     this.pending.delete(requestId);
     clearTimeout(entry.timer);
-    entry.resolve(sourceId !== null && entry.allowed.has(sourceId) ? sourceId : null);
+    entry.resolve(
+      sourceId !== null && entry.allowed.has(sourceId) ? { sourceId, includeAudio } : null,
+    );
   }
 
   /** Cancela tudo (ex.: a janela fechou). */

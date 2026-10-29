@@ -93,6 +93,26 @@ export class FakeLocalParticipant extends FakeParticipant {
     this.sharing = on;
     return Promise.resolve();
   });
+
+  /** Faixas publicadas à mão (ex.: som do PC no app desktop), por fonte. */
+  published = new Map<string, unknown>();
+
+  publishTrack = vi.fn((track: unknown, options: { source: string }) => {
+    this.published.set(options.source, track);
+    return Promise.resolve();
+  });
+
+  unpublishTrack = vi.fn((track: unknown) => {
+    for (const [source, current] of this.published) {
+      if (current === track) this.published.delete(source);
+    }
+    return Promise.resolve();
+  });
+
+  getTrackPublication(source: string): { track: unknown } | undefined {
+    const track = this.published.get(source);
+    return track ? { track } : undefined;
+  }
 }
 
 /** Sala do LiveKit de mentira: guarda os listeners e deixa o teste disparar eventos. */

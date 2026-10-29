@@ -1,4 +1,5 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { SYSTEM_AUDIO_MESSAGE } from '@discord-2/shared';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
@@ -19,6 +20,15 @@ vi.mock('./livekit', () => ({
   },
   listAudioDevices: () => Promise.resolve([]),
 }));
+
+// Som do PC do app desktop: a parte de áudio de verdade (AudioWorklet) não
+// existe no jsdom; aqui só importa o que o VoiceProvider faz com a faixa.
+const systemAudio = vi.hoisted(() => ({
+  track: { kind: 'audio', id: 'som-do-pc' },
+  close: vi.fn(),
+  create: vi.fn(),
+}));
+vi.mock('../desktop/systemAudio', () => ({ createSystemAudio: systemAudio.create }));
 
 const voice = channel({ id: 'v-1', name: 'papo', type: 'VOICE', position: 1 });
 
@@ -265,5 +275,96 @@ describe('assistir a tela de alguém', () => {
     await user.click(screen.getByRole('button', { name: 'Tela cheia' }));
 
     expect(requestFullscreen).toHaveBeenCalled();
+  });
+});
+
+describe('som do PC (app desktop)', () => {
+  /** O app desktop entrega o canal do som do PC, como o preload faz. */
+  function deliverSystemAudio() {
+    const port = { close: vi.fn() };
+    const event = new MessageEvent('message', {
+      data: { type: SYSTEM_AUDIO_MESSAGE },
+      origin: window.location.origin,
+    });
+    Object.defineProperty(event, 'source', { value: window });
+    Object.defineProperty(event, 'ports', { value: [port] });
+    act(() => {
+      window.dispatchEvent(event);
+    });
+    return port;
+  }
+
+  beforeEach(() => {
+    systemAudio.close.mockReset();
+    systemAudio.create.mockReset();
+    systemAudio.create.mockResolvedValue({ track: systemAudio.track, close: systemAudio.close });
+  });
+
+  it('vira o áudio da tela na transmissão', async () => {
+    withVoiceGuild();
+    await joinVoice();
+    const local = lastRoom().localParticipant;
+
+    const port = deliverSystemAudio();
+
+    await waitFor(() => expect(local.publishTrack).toHaveBeenCalled());
+    expect(systemAudio.create).toHaveBeenCalledWith(port);
+    expect(local.publishTrack).toHaveBeenCalledWith(
+      systemAudio.track,
+      expect.objectContaining({ source: 'screen_share_audio', forceStereo: true }),
+    );
+  });
+
+  it('parar a transmissão tira o som do PC e desliga a captura', async () => {
+    withVoiceGuild();
+    await joinVoice();
+    const room = lastRoom();
+    const pub = { source: 'screen_share', track: new FakeTrack('video') };
+    room.fire('localTrackPublished', pub);
+    deliverSystemAudio();
+    await waitFor(() => expect(room.localParticipant.publishTrack).toHaveBeenCalled());
+
+    room.fire('localTrackUnpublished', pub);
+
+    await waitFor(() => expect(systemAudio.close).toHaveBeenCalledOnce());
+    expect(room.localParticipant.unpublishTrack).toHaveBeenCalledWith(systemAudio.track);
+  });
+
+  it('sair da voz também desliga a captura', async () => {
+    withVoiceGuild();
+    const user = await joinVoice();
+    deliverSystemAudio();
+    await waitFor(() => expect(lastRoom().localParticipant.publishTrack).toHaveBeenCalled());
+
+    await user.click(within(await panel()).getByRole('button', { name: 'Sair da voz' }));
+
+    expect(systemAudio.close).toHaveBeenCalledOnce();
+  });
+
+  it('fora da voz, fecha o canal sem capturar', async () => {
+    withVoiceGuild();
+    render(
+      <MemoryRouter initialEntries={['/channels/g-1/c-geral']}>
+        <App />
+      </MemoryRouter>,
+    );
+    await screen.findByRole('button', { name: 'Entrar no canal de voz papo' });
+
+    const port = deliverSystemAudio();
+
+    await waitFor(() => expect(port.close).toHaveBeenCalled());
+    expect(systemAudio.create).not.toHaveBeenCalled();
+  });
+
+  it('se o áudio falhar, avisa (a imagem continua)', async () => {
+    withVoiceGuild();
+    await joinVoice();
+    systemAudio.create.mockRejectedValue(new Error('sem AudioWorklet'));
+
+    deliverSystemAudio();
+
+    expect(
+      await within(await panel()).findByText('Não foi possível transmitir o som do PC.'),
+    ).toBeInTheDocument();
   });
 });

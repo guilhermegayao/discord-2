@@ -26,6 +26,7 @@ function installBridge() {
 
 const request: PickerRequest = {
   requestId: 'pick-1',
+  systemAudio: true,
   sources: [
     {
       id: 'screen:0:0',
@@ -80,7 +81,7 @@ describe('<ScreenPicker /> (app desktop)', () => {
     await user.click(screen.getByRole('button', { name: /Meu Jogo/ }));
     await user.click(screen.getByRole('button', { name: 'Compartilhar' }));
 
-    expect(bridge.respondScreenPicker).toHaveBeenCalledWith('pick-1', 'window:7:0');
+    expect(bridge.respondScreenPicker).toHaveBeenCalledWith('pick-1', 'window:7:0', true);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
@@ -92,7 +93,7 @@ describe('<ScreenPicker /> (app desktop)', () => {
 
     await user.dblClick(screen.getByRole('button', { name: /Tela 1/ }));
 
-    expect(bridge.respondScreenPicker).toHaveBeenCalledWith('pick-1', 'screen:0:0');
+    expect(bridge.respondScreenPicker).toHaveBeenCalledWith('pick-1', 'screen:0:0', true);
   });
 
   it('cancelar (botão ou Esc) devolve null ao app', async () => {
@@ -105,8 +106,8 @@ describe('<ScreenPicker /> (app desktop)', () => {
     open({ ...request, requestId: 'pick-2' });
     await user.keyboard('{Escape}');
 
-    expect(bridge.respondScreenPicker).toHaveBeenNthCalledWith(1, 'pick-1', null);
-    expect(bridge.respondScreenPicker).toHaveBeenNthCalledWith(2, 'pick-2', null);
+    expect(bridge.respondScreenPicker).toHaveBeenNthCalledWith(1, 'pick-1', null, true);
+    expect(bridge.respondScreenPicker).toHaveBeenNthCalledWith(2, 'pick-2', null, true);
   });
 
   it('janela sem prévia (jogo em tela cheia) aparece e pode ser compartilhada', async () => {
@@ -115,6 +116,7 @@ describe('<ScreenPicker /> (app desktop)', () => {
     render(<ScreenPicker />);
     open({
       requestId: 'pick-3',
+      systemAudio: false,
       sources: [
         {
           id: 'window:9:0',
@@ -132,7 +134,7 @@ describe('<ScreenPicker /> (app desktop)', () => {
     await user.click(option);
     await user.click(screen.getByRole('button', { name: 'Compartilhar' }));
 
-    expect(bridge.respondScreenPicker).toHaveBeenCalledWith('pick-3', 'window:9:0');
+    expect(bridge.respondScreenPicker).toHaveBeenCalledWith('pick-3', 'window:9:0', false);
   });
 
   it('na aba de janelas, explica o que fazer quando o jogo não aparece', async () => {
@@ -147,12 +149,27 @@ describe('<ScreenPicker /> (app desktop)', () => {
     expect(screen.getByText(/Não achou o jogo/)).toHaveTextContent('Janela sem bordas');
   });
 
-  it('avisa que o áudio do sistema ainda não vai junto no app', () => {
+  it('som do PC vem marcado e dá para desmarcar', async () => {
+    const user = userEvent.setup();
+    const { bridge, open } = installBridge();
+    render(<ScreenPicker />);
+    open(request);
+
+    const audio = screen.getByRole('checkbox', { name: /Incluir som do PC/ });
+    expect(audio).toBeChecked();
+    await user.click(audio);
+    await user.dblClick(screen.getByRole('button', { name: /Tela 1/ }));
+
+    expect(bridge.respondScreenPicker).toHaveBeenCalledWith('pick-1', 'screen:0:0', false);
+  });
+
+  it('sem suporte (Windows 10), não oferece o som do PC e explica', () => {
     const { open } = installBridge();
     render(<ScreenPicker />);
 
-    open(request);
+    open({ ...request, systemAudio: false });
 
-    expect(screen.getByText(/áudio do sistema ainda não vai junto/)).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.getByText(/precisa do Windows 11/)).toBeInTheDocument();
   });
 });

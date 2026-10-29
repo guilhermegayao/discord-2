@@ -63,9 +63,9 @@ describe('PickerBroker', () => {
     let sentId = '';
     const choice = broker.request(sources, (id) => (sentId = id));
 
-    broker.respond(sentId, 'window:1:0');
+    broker.respond(sentId, 'window:1:0', true);
 
-    await expect(choice).resolves.toBe('window:1:0');
+    await expect(choice).resolves.toEqual({ sourceId: 'window:1:0', includeAudio: true });
   });
 
   it('cancelar (null) resolve com null', async () => {
@@ -97,7 +97,7 @@ describe('PickerBroker', () => {
     broker.respond(sentId, 'screen:0:0');
     broker.respond(sentId, 'window:1:0');
 
-    await expect(choice).resolves.toBe('screen:0:0');
+    await expect(choice).resolves.toEqual({ sourceId: 'screen:0:0', includeAudio: false });
   });
 
   it('desiste sozinho depois do tempo limite', async () => {

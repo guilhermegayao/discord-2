@@ -1,4 +1,5 @@
 import {
+  AudioPresets,
   DisconnectReason,
   type LocalTrackPublication,
   type Participant,
@@ -12,6 +13,8 @@ import {
 } from 'livekit-client';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import * as voiceApi from '../api/voice';
+import { onSystemAudioPort } from '../desktop/bridge';
+import { createSystemAudio, type SystemAudio } from '../desktop/systemAudio';
 import { createRoom } from './livekit';
 import { canShareScreen, SHARE_PRESETS, type SharePreset } from './screenShare';
 import {
@@ -108,9 +111,13 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   const watchingRef = useRef<string | null>(null);
   /** Estado do microfone antes de ensurdecer, para restaurar depois. */
   const micBeforeDeafen = useRef(true);
+  /** Som do PC vindo do app desktop (Fase 6b), enquanto eu transmito. */
+  const systemAudioRef = useRef<SystemAudio | null>(null);
 
   const reset = useCallback(() => {
     roomRef.current = null;
+    systemAudioRef.current?.close();
+    systemAudioRef.current = null;
     setStatus('idle');
     setChannel(null);
     setMicEnabled(false);
@@ -132,6 +139,17 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     setError(null);
     await room?.disconnect();
   }, [reset]);
+
+  /** Tira o som do PC da transmissão e desliga a captura no app. */
+  const stopSystemAudio = useCallback(async () => {
+    const audio = systemAudioRef.current;
+    if (!audio) return;
+    systemAudioRef.current = null;
+    const room = roomRef.current;
+    const pub = room?.localParticipant.getTrackPublication(Track.Source.ScreenShareAudio);
+    if (room && pub?.track) await room.localParticipant.unpublishTrack(pub.track).catch(() => null);
+    audio.close();
+  }, []);
 
   const join = useCallback(
     async (target: VoiceChannelRef) => {
@@ -212,6 +230,8 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
             if (pub.source === Track.Source.ScreenShare) {
               setSharing(false);
               setLocalScreenTrack(null);
+              // Parou a tela (botão nosso ou do sistema): o som do PC para junto.
+              void stopSystemAudio();
             }
             refresh();
           })
@@ -244,7 +264,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         setError('Não foi possível entrar no canal de voz. O servidor de voz está rodando?');
       }
     },
-    [channel?.id, leave, reset],
+    [channel?.id, leave, reset, stopSystemAudio],
   );
 
   const toggleMic = useCallback(async () => {
@@ -289,24 +309,69 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     await roomRef.current?.switchActiveDevice(kind, deviceId);
   }, []);
 
-  const startShare = useCallback(async (preset: SharePreset) => {
-    const room = roomRef.current;
-    if (!room) return;
-    if (!canShareScreen()) {
-      setError('Este navegador não permite compartilhar a tela.');
-      return;
-    }
-    const { capture, publish } = SHARE_PRESETS[preset];
-    try {
-      setError(null);
-      await room.localParticipant.setScreenShareEnabled(true, capture, publish);
-    } catch (err) {
-      const name = err instanceof Error ? err.name : '';
-      // Fechar o seletor do navegador sem escolher nada não é erro.
-      if (name === 'NotAllowedError' || name === 'AbortError') return;
-      setError('Não foi possível compartilhar a tela.');
-    }
-  }, []);
+  /**
+   * App desktop: quando o usuário marca "Incluir som do PC" no seletor, o app
+   * manda um canal com o áudio do PC (sem as vozes da chamada). Ele vira o
+   * áudio da tela, igual ao do navegador: quem assiste ouve pelo mesmo caminho.
+   */
+  useEffect(
+    () =>
+      onSystemAudioPort((port) => {
+        void (async () => {
+          const room = roomRef.current;
+          await stopSystemAudio();
+          if (!room) {
+            port.close();
+            return;
+          }
+          let audio: SystemAudio | null = null;
+          try {
+            audio = await createSystemAudio(port);
+            if (roomRef.current !== room) {
+              audio.close();
+              return;
+            }
+            systemAudioRef.current = audio;
+            await room.localParticipant.publishTrack(audio.track, {
+              source: Track.Source.ScreenShareAudio,
+              name: 'screen_share_audio',
+              audioPreset: AudioPresets.musicHighQualityStereo,
+              forceStereo: true,
+              dtx: false,
+              red: false,
+            });
+          } catch {
+            if (systemAudioRef.current === audio) systemAudioRef.current = null;
+            audio?.close();
+            setError('Não foi possível transmitir o som do PC.');
+          }
+        })();
+      }),
+    [stopSystemAudio],
+  );
+
+  const startShare = useCallback(
+    async (preset: SharePreset) => {
+      const room = roomRef.current;
+      if (!room) return;
+      if (!canShareScreen()) {
+        setError('Este navegador não permite compartilhar a tela.');
+        return;
+      }
+      const { capture, publish } = SHARE_PRESETS[preset];
+      try {
+        setError(null);
+        await room.localParticipant.setScreenShareEnabled(true, capture, publish);
+      } catch (err) {
+        const name = err instanceof Error ? err.name : '';
+        void stopSystemAudio();
+        // Fechar o seletor do navegador sem escolher nada não é erro.
+        if (name === 'NotAllowedError' || name === 'AbortError') return;
+        setError('Não foi possível compartilhar a tela.');
+      }
+    },
+    [stopSystemAudio],
+  );
 
   const stopShare = useCallback(async () => {
     await roomRef.current?.localParticipant.setScreenShareEnabled(false);

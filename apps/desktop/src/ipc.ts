@@ -6,4 +6,6 @@
 export const IPC = {
   pickerRequest: 'screen-picker:request',
   pickerResponse: 'screen-picker:response',
+  /** O processo principal entrega à página o canal (MessagePort) do som do PC. */
+  systemAudioPort: 'system-audio:port',
 } as const;

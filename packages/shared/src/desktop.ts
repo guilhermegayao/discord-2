@@ -19,16 +19,29 @@ export interface PickerSource {
   appIcon: string | null;
 }
 
+/**
+ * Tipo da mensagem (window.postMessage) com que o preload entrega à página o
+ * MessagePort do som do PC. Um MessagePort não passa pelo contextBridge,
+ * então ele chega como mensagem da própria janela.
+ */
+export const SYSTEM_AUDIO_MESSAGE = 'discord-2:system-audio';
+
 /** O app pediu para o usuário escolher o que compartilhar. */
 export interface PickerRequest {
   requestId: string;
   sources: PickerSource[];
+  /** Se dá para incluir o som do PC (Windows 11 com o módulo nativo). */
+  systemAudio: boolean;
 }
 
 export interface DesktopBridge {
   platform: string;
   /** Avisa quando o front deve mostrar o seletor de tela. Devolve a função para parar de ouvir. */
   onScreenPickerRequest: (listener: (request: PickerRequest) => void) => () => void;
-  /** Resposta do seletor: o id escolhido, ou null se cancelou. */
-  respondScreenPicker: (requestId: string, sourceId: string | null) => void;
+  /**
+   * Resposta do seletor: o id escolhido (ou null se cancelou) e se é para
+   * incluir o som do PC. O áudio chega depois por um MessagePort
+   * (ver `onSystemAudioPort` no front).
+   */
+  respondScreenPicker: (requestId: string, sourceId: string | null, includeAudio: boolean) => void;
 }

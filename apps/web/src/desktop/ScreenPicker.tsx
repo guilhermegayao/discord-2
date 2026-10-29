@@ -14,6 +14,7 @@ export function ScreenPicker() {
   const [request, setRequest] = useState<PickerRequest | null>(null);
   const [tab, setTab] = useState<Tab>('screen');
   const [selected, setSelected] = useState<string | null>(null);
+  const [includeAudio, setIncludeAudio] = useState(true);
 
   useEffect(() => {
     const bridge = getDesktopBridge();
@@ -29,7 +30,11 @@ export function ScreenPicker() {
   if (!request) return null;
 
   const answer = (sourceId: string | null) => {
-    getDesktopBridge()?.respondScreenPicker(request.requestId, sourceId);
+    getDesktopBridge()?.respondScreenPicker(
+      request.requestId,
+      sourceId,
+      request.systemAudio && includeAudio,
+    );
     setRequest(null);
   };
 
@@ -80,10 +85,21 @@ export function ScreenPicker() {
           </p>
         )}
 
-        <p className="muted picker__note">
-          🔇 O áudio do sistema ainda não vai junto no app (chega na próxima versão). Para
-          transmitir com som agora, use o navegador e compartilhe uma aba.
-        </p>
+        {request.systemAudio ? (
+          <label className="picker__audio">
+            <input
+              type="checkbox"
+              checked={includeAudio}
+              onChange={(event) => setIncludeAudio(event.target.checked)}
+            />
+            🔊 Incluir som do PC <span className="muted">(sem as vozes da chamada)</span>
+          </label>
+        ) : (
+          <p className="muted picker__note">
+            🔇 Neste computador o som do PC não vai junto (precisa do Windows 11). Para transmitir
+            com som, use o navegador e compartilhe uma aba.
+          </p>
+        )}
 
         <div className="modal__actions">
           <button type="button" className="button--secondary" onClick={() => answer(null)}>
