@@ -10,18 +10,18 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 
 ## Status das fases
 
-| Fase | Entrega                                                                   | Status       |
-| ---- | ------------------------------------------------------------------------- | ------------ |
-| 0    | Fundação: monorepo, Postgres, `/health`, tela inicial, lint, testes, CI   | ✅ Concluída |
-| 1    | Contas: cadastro, login, sessão persistente com refresh token             | ✅ Concluída |
-| 2    | Servidores e chat: canais de texto, mensagens em tempo real, paginação    | ✅ Concluída |
-| 3    | Social: convites, membros, presença, "digitando...", DMs                  | ✅ Concluída |
-| 4    | Voz com LiveKit                                                           | ✅ Concluída |
-| 5    | Compartilhamento de tela no navegador (getDisplayMedia)                   | ✅ Concluída |
-| 6a   | App desktop Electron: seletor próprio de tela/janela, instalador `.exe`   | ✅ Concluída |
-| 6b   | Áudio do sistema no app sem eco (módulo nativo do Windows)                | ⏳ Próxima   |
-| 7    | Deploy gratuito (back, banco, LiveKit Cloud)                              | —            |
-| 8    | Mobile com Expo (incluindo tela no iOS via ReplayKit/Broadcast Extension) | —            |
+| Fase | Entrega                                                                   | Status                            |
+| ---- | ------------------------------------------------------------------------- | --------------------------------- |
+| 0    | Fundação: monorepo, Postgres, `/health`, tela inicial, lint, testes, CI   | ✅ Concluída                      |
+| 1    | Contas: cadastro, login, sessão persistente com refresh token             | ✅ Concluída                      |
+| 2    | Servidores e chat: canais de texto, mensagens em tempo real, paginação    | ✅ Concluída                      |
+| 3    | Social: convites, membros, presença, "digitando...", DMs                  | ✅ Concluída                      |
+| 4    | Voz com LiveKit                                                           | ✅ Concluída                      |
+| 5    | Compartilhamento de tela no navegador (getDisplayMedia)                   | ✅ Concluída                      |
+| 6a   | App desktop Electron: seletor próprio de tela/janela, instalador `.exe`   | ✅ Concluída                      |
+| 6b   | Áudio do sistema no app sem eco (módulo nativo do Windows)                | ✅ Concluída (falta teste manual) |
+| 7    | Deploy gratuito (back, banco, LiveKit Cloud)                              | —                                 |
+| 8    | Mobile com Expo (incluindo tela no iOS via ReplayKit/Broadcast Extension) | —                                 |
 
 ---
 
@@ -400,14 +400,51 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 
 ---
 
-## Fase 6b — Áudio do sistema sem eco (próxima)
+## Fase 6b — Áudio do sistema sem eco ✅ (29/10/2026)
 
-Plano:
+### O que foi feito
 
-- **Módulo nativo em C++** (node-addon-api) usando a captura de áudio **por processo** do Windows (`PROCESS_LOOPBACK_MODE_EXCLUDE_TARGET_PROCESS_TREE`): captura o som do PC **menos o próprio app**, então a voz da chamada não volta para quem assiste.
-- O áudio entra no LiveKit como `screen_share_audio`, junto com a tela escolhida no seletor.
-- Requisitos: **Windows 11** e **Visual Studio Build Tools** para compilar (instalação global: pedir autorização antes). No CI, o runner do Windows já tem as ferramentas.
-- Referência estudada: `thomas-quant/wasapi-loopback`. Preferência por escrever o nosso, pequeno e com testes.
+- **Módulo nativo em C++** (`apps/desktop/native`, node-addon-api, ~200 linhas):
+  - Usa a captura **por processo** do Windows (`ActivateAudioInterfaceAsync` com `PROCESS_LOOPBACK_MODE_EXCLUDE_TARGET_PROCESS_TREE`): grava o som do PC **menos o processo do app e todos os filhos dele**.
+  - Como o áudio da chamada toca num processo filho do Electron, **a voz de quem está na chamada não volta para quem assiste** (sem eco).
+  - Roda numa thread própria e entrega pedaços de ~10 ms (48 kHz, estéreo) ao JavaScript por uma `ThreadSafeFunction`.
+  - Usa N-API, que tem ABI estável: o mesmo `.node` funciona no Node (testes) e no Electron, sem recompilar para cada versão.
+- **Caminho do áudio**:
+  - O processo principal liga a captura quando o seletor volta com "Incluir som do PC" e entrega à página um `MessagePort`. O preload o repassa como mensagem da janela, porque um `MessagePort` não atravessa o `contextBridge`.
+  - Na página, um **AudioWorklet** recebe os pedaços numa fila (reserva de 40 ms, no máximo 100 ms de atraso, descartando o mais antigo) e gera uma faixa de áudio.
+  - A faixa é publicada no LiveKit como **áudio da tela** (estéreo, qualidade de música): quem assiste ouve pelo mesmo caminho do áudio de aba do navegador.
+  - Parar a tela (botão nosso ou do sistema), sair da voz ou fechar o app **fecha o canal**, e fechar o canal desliga a captura. O inverso também vale.
+- **Seletor**: opção **🔊 Incluir som do PC** (marcada por padrão) quando o Windows suporta (build 20348+, Windows 11). Sem suporte, explica e sugere o navegador.
+- **Instalador e CI**: o `.node` vai fora do `.asar` (`asarUnpack`), e `dist:desktop` compila o módulo antes de empacotar. O job do Windows compila o módulo e roda o teste de fumaça dele.
+- **Testes (295 no total)**: shared 31; server 121; web 111, com 4 novos da fila de áudio, 5 do som do PC no `VoiceProvider` e 2 da opção no seletor; desktop 34, com 9 novos (sessão de captura, suporte, carregamento e um teste de fumaça do módulo real, que só roda no Windows).
+- **Testado aqui**:
+  - **Exclusão comprovada com um tom puro de 1 kHz**: excluindo outro processo, o tom aparece com amplitude 0,400 (a do arquivo); excluindo o processo que toca, ele some (0,002 a 0,004, só o ruído do resto do PC).
+  - **No app empacotado**: o módulo carrega de dentro do instalador, o seletor oferece o som do PC, o canal chega à página, o worklet gera a faixa e o tom tocado por outro programa aparece com pico exato em 1000 Hz.
+  - **Falta você conferir**: a transmissão de verdade entre duas contas, ouvindo o som do PC e confirmando que a sua voz não volta.
+
+### Decisões tomadas
+
+| Decisão                                                | Motivo                                                                                                                       |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Módulo próprio em C++**, em vez de biblioteca pronta | Pequeno, sem dependência de terceiros abandonável, e é um bom exemplo de integração nativa para o portfólio.                 |
+| **Excluir a árvore do processo principal**             | O áudio do Electron toca num processo filho (serviço de áudio); excluir só a janela não bastaria.                            |
+| **Áudio via `MessagePort` + AudioWorklet**             | O áudio não passa pela thread principal da página (onde fica o React) e chega a cada 10 ms sem travar a interface.           |
+| **Fila com teto de 100 ms**                            | A placa de som e o navegador têm relógios diferentes; sem teto, o atraso cresceria aos poucos durante uma transmissão longa. |
+| **PCM 16 bits pedido ao Windows**                      | É o formato que a captura por processo aceita com certeza; a conversão para float é feita no próprio módulo.                 |
+| **Autoplay liberado só na janela do app**              | O `AudioContext` nasce depois de várias esperas, longe do clique, e sem isso começaria pausado.                              |
+
+### Imprevistos encontrados
+
+- **O primeiro teste de exclusão enganava**: o script de teste excluía a si mesmo, e o processo que tocava o som era filho dele, então também ficava excluído. Ao mesmo tempo, o som de fundo do PC (uma live aberta) mascarava as medidas de volume. Solução: um tom puro de 1 kHz medido por correlação, e um processo "irmão" como controle.
+- Funções de ponte entre threads no C++ não podem usar o objeto (`this`): mensagens na fila podem chegar depois de ele ser coletado. O módulo usa um callback único, sem estado.
+- `Set-Content -Encoding utf8` do PowerShell 5.1 grava BOM no arquivo; ele foi removido. Edições de arquivo continuam só pela ferramenta de edição ou por Python.
+- O crash nativo raro dos testes do servidor no Windows (`0xC0000409`, ver Fase 2) apareceu de novo, sem relação com esta fase. O CI no Linux passa.
+
+### Pendências e observações
+
+- **Teste manual do Guilherme**: transmitir com som do PC e ouvir de outra conta, sem eco.
+- Jogos com anti-cheat podem bloquear a captura de áudio; nesse caso só a imagem vai.
+- Compilar o instalador na própria máquina exige o **Visual Studio Build Tools** (instalado em 29/10/2026).
 
 ---
 
@@ -433,6 +470,7 @@ Plano:
 - **Fase 4:** WebRTC e por que um SFU (LiveKit) em vez de P2P; token de acesso com permissões (grants); webhooks assinados e verificação sobre o corpo cru; fonte da verdade (servidor de mídia) vs. estado derivado; UDP/TCP, ICE e o IP anunciado; refs vs. estado no React; dublês de bibliotecas de mídia nos testes.
 - **Fase 5:** `getDisplayMedia` e limites por navegador; simulcast e adaptive stream; `contentHint` (motion vs detail); taxa de bits vs resolução vs fps; assinatura seletiva de faixas para economizar banda; Fullscreen API.
 - **Fase 6a:** processos do Electron (main, preload, renderer); `contextIsolation`, `sandbox` e a superfície de ataque de um app desktop; IPC e validar quem envia; permissões por origem; empacotamento e instalador (NSIS, asar); assinatura de código e SmartScreen; build no CI em outro sistema operacional.
+- **Fase 6b:** módulos nativos (N-API e ABI estável); threads e como chamar JavaScript de outra thread; COM e APIs assíncronas do Windows; áudio digital (taxa de amostragem, PCM vs float, canais intercalados); fila circular e deriva de relógio; AudioWorklet e a thread de áudio; `MessagePort` e transferência de objetos; como provar algo com um experimento de controle.
 
 ---
 
