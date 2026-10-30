@@ -300,6 +300,25 @@ describe('som do PC (app desktop)', () => {
     systemAudio.create.mockResolvedValue({ track: systemAudio.track, close: systemAudio.close });
   });
 
+  it('no app, a captura não pede o áudio do Chromium (levaria as vozes: eco)', async () => {
+    (window as Window & { desktop?: unknown }).desktop = {
+      platform: 'win32',
+      onScreenPickerRequest: () => () => undefined,
+      respondScreenPicker: vi.fn(),
+    };
+    try {
+      withVoiceGuild();
+      const user = await joinVoice();
+
+      await user.click(within(await panel()).getByRole('button', { name: 'Compartilhar tela' }));
+      await user.click(screen.getByRole('button', { name: 'Escolher tela' }));
+
+      expect(lastShareCall()[1]).toMatchObject({ audio: false, systemAudio: 'exclude' });
+    } finally {
+      Reflect.deleteProperty(window, 'desktop');
+    }
+  });
+
   it('vira o áudio da tela na transmissão', async () => {
     withVoiceGuild();
     await joinVoice();

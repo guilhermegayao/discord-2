@@ -436,6 +436,10 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 ### Imprevistos encontrados
 
 - **O primeiro teste de exclusão enganava**: o script de teste excluía a si mesmo, e o processo que tocava o som era filho dele, então também ficava excluído. Ao mesmo tempo, o som de fundo do PC (uma live aberta) mascarava as medidas de volume. Solução: um tom puro de 1 kHz medido por correlação, e um processo "irmão" como controle.
+- **Eco só ao transmitir a tela inteira** (teste do Guilherme, 30/10/2026):
+  - O servidor do LiveKit mostrou uma faixa de áudio da tela mesmo num app sem o módulo nativo: ao escolher uma **tela**, o Chromium anexa sozinho o som do PC **completo** (com as vozes). Com janela ele não consegue, por isso não ecoava.
+  - Correção: dentro do app, a captura pede `audio: false`; o único áudio da tela é o do módulo nativo. Um teste garante isso.
+  - O app instalado ainda era a versão de 28/10, por isso o seletor não oferecia o som do PC.
 - Funções de ponte entre threads no C++ não podem usar o objeto (`this`): mensagens na fila podem chegar depois de ele ser coletado. O módulo usa um callback único, sem estado.
 - `Set-Content -Encoding utf8` do PowerShell 5.1 grava BOM no arquivo; ele foi removido. Edições de arquivo continuam só pela ferramenta de edição ou por Python.
 - O crash nativo raro dos testes do servidor no Windows (`0xC0000409`, ver Fase 2) apareceu de novo, sem relação com esta fase. O CI no Linux passa.

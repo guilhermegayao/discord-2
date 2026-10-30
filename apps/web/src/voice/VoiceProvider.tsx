@@ -13,7 +13,7 @@ import {
 } from 'livekit-client';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import * as voiceApi from '../api/voice';
-import { onSystemAudioPort } from '../desktop/bridge';
+import { getDesktopBridge, onSystemAudioPort } from '../desktop/bridge';
 import { createSystemAudio, type SystemAudio } from '../desktop/systemAudio';
 import { createRoom } from './livekit';
 import { canShareScreen, SHARE_PRESETS, type SharePreset } from './screenShare';
@@ -359,9 +359,15 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
         return;
       }
       const { capture, publish } = SHARE_PRESETS[preset];
+      // No app desktop, o áudio da tela vem só do módulo nativo (sem as vozes).
+      // Se pedíssemos áudio aqui, ao escolher a tela inteira o Chromium
+      // anexaria o som do PC completo, com a chamada junto: eco.
+      const options = getDesktopBridge()
+        ? { ...capture, audio: false, systemAudio: 'exclude' as const }
+        : capture;
       try {
         setError(null);
-        await room.localParticipant.setScreenShareEnabled(true, capture, publish);
+        await room.localParticipant.setScreenShareEnabled(true, options, publish);
       } catch (err) {
         const name = err instanceof Error ? err.name : '';
         void stopSystemAudio();
