@@ -446,7 +446,9 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 
 ### Pendências e observações
 
-- **Teste manual do Guilherme**: transmitir com som do PC e ouvir de outra conta, sem eco.
+- **Testado pelo Guilherme (30/10/2026)**: o som do PC vai junto, a voz não volta para quem assiste e a tela inteira não ecoa mais.
+  - **Limitação do teste num PC só**: a conta que assiste fica no Chrome, que não é o discord-2, então o som que ela toca também é capturado e volta para a transmissão. Para testar sozinho, é preciso mutar o som de um dos lados. Entre dois computadores isso não acontece.
+- Falta o teste real com um amigo, em outro PC (depois da Fase 7, quando o app tiver endereço público).
 - Jogos com anti-cheat podem bloquear a captura de áudio; nesse caso só a imagem vai.
 - Compilar o instalador na própria máquina exige o **Visual Studio Build Tools** (instalado em 29/10/2026).
 
