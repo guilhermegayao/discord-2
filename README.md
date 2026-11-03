@@ -44,6 +44,7 @@ discord-2/
 │   └── web/       → front-end React + Vite
 ├── packages/
 │   └── shared/    → tipos e validações compartilhados
+├── deploy/        → produção (compose, Caddy, guia da VM)
 ├── docker-compose.yml
 └── ROADMAP.md
 ```
@@ -125,6 +126,10 @@ O app desktop abre o mesmo front do navegador numa janela própria, com um selet
 - Por enquanto o app aponta para `http://localhost:5174`, então o projeto precisa estar rodando (`npm run dev`). Para outra URL, defina `DISCORD2_APP_URL` antes de abrir.
 - **Som do PC sem eco** (Windows 11): no seletor, deixe marcado **🔊 Incluir som do PC**. Vai o som de jogos, vídeos e música, mas não as vozes da chamada, que tocam dentro do app.
 - Gerar o instalador na sua máquina exige o **Visual Studio Build Tools** (carga "Desenvolvimento para desktop com C++"), por causa do módulo nativo de áudio.
+
+## Deploy
+
+Produção numa VM gratuita da Oracle, com Docker Compose: Caddy (HTTPS automático), servidor, Postgres e LiveKit com TURN. As imagens são publicadas pelo CI no GitHub Container Registry. Passo a passo em [deploy/README.md](deploy/README.md).
 
 ## Autenticação (resumo)
 

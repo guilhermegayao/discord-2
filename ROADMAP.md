@@ -20,7 +20,7 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 | 5    | Compartilhamento de tela no navegador (getDisplayMedia)                   | ✅ Concluída                      |
 | 6a   | App desktop Electron: seletor próprio de tela/janela, instalador `.exe`   | ✅ Concluída                      |
 | 6b   | Áudio do sistema no app sem eco (módulo nativo do Windows)                | ✅ Concluída (falta teste manual) |
-| 7    | Deploy gratuito (back, banco, LiveKit Cloud)                              | —                                 |
+| 7    | Deploy gratuito: VM da Oracle com Caddy, Postgres e LiveKit próprio       | 🔄 Em andamento (7a pronta)       |
 | 8    | Mobile com Expo (incluindo tela no iOS via ReplayKit/Broadcast Extension) | —                                 |
 
 ---
@@ -454,6 +454,56 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 
 ---
 
+## Fase 7 — Deploy gratuito 🔄 (7a: 03/11/2026)
+
+Plano aprovado: **7a** preparar o projeto para produção · **7b** criar a VM da Oracle (São Paulo) e subir · **7c** app desktop apontando para o endereço público, deploy pelo GitHub, backup e o teste real entre dois PCs. Endereço: subdomínio gratuito do **DuckDNS**.
+
+### 7a — O que foi feito
+
+- **Imagens Docker** a partir do monorepo (`apps/server/Dockerfile`, `apps/web/Dockerfile`):
+  - `server`: só dependências de produção e o código compilado, rodando como usuário sem privilégio e com _healthcheck_ no `/api/health`;
+  - `migrate`: roda `prisma migrate deploy` e sai; o servidor só sobe depois que ele termina bem;
+  - `web`: o build do Vite dentro do **Caddy**.
+- **`deploy/`**: o compose de produção, o `Caddyfile`, um `setup-env.sh` que gera o `.env` com segredos aleatórios **na própria VM** (sem mostrar na tela) e um guia passo a passo (`deploy/README.md`).
+  - O Caddy faz HTTPS automático (Let's Encrypt), redireciona HTTP para HTTPS, serve o site com as rotas do React e cache longo nos arquivos de `/assets`, manda cabeçalhos de segurança e repassa `/api` e o Socket.IO para o servidor.
+  - O banco e o servidor não têm porta pública: só a rede interna do compose.
+  - **LiveKit com TURN embutido** para quem está atrás de NAT difícil (4G, alguns roteadores).
+- **Servidor**: nova opção `TRUST_PROXY`, para o rate limit de login e cadastro enxergar o IP real de cada pessoa atrás do Caddy.
+- **CI**: um job publica as três imagens no **GitHub Container Registry** a cada push na `main`, com build **nativo em ARM** (`ubuntu-24.04-arm`, gratuito para repositório público), com as tags `latest` e `sha-…`.
+- **Testes (300 no total)**: server 123, com 2 novos do proxy; o resto sem mudança.
+- **Testado aqui, com a pilha de produção inteira no Docker local** (`APP_DOMAIN=localhost`):
+  - as migrations rodaram e o servidor ficou saudável;
+  - pelo HTTPS do Caddy, responderam o site, as rotas do React, o `/api/health`, o redirecionamento HTTP→HTTPS e o Socket.IO;
+  - o cadastro funcionou, e o cookie sai com `Secure; HttpOnly; SameSite=Lax`;
+  - o token de voz aponta para `wss://livekit.localhost`, e o servidor sincronizou com o LiveKit pela rede interna;
+  - o `setup-env.sh` recusa rodar sem domínio, não sobrescreve um `.env` existente e gera segredos de 48 caracteres.
+
+### Decisões tomadas
+
+| Decisão                                          | Motivo                                                                                                                         |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Tudo numa VM, em Docker Compose**              | Grupo pequeno, custo zero; um único `docker compose up -d` sobe tudo, igual ao desenvolvimento.                                |
+| **Caddy** como proxy                             | HTTPS automático e renovação sem configurar nada; site e API no mesmo endereço (sem CORS, cookie igual ao dev).                |
+| **Migrations num container próprio**             | A CLI do Prisma é dependência de desenvolvimento; a imagem do servidor fica sem ela, e o servidor só sobe com o banco migrado. |
+| **Segredos gerados na VM**                       | Nunca passam pelo chat, pelo git ou pelo CI.                                                                                   |
+| **Imagens só arm64, construídas em máquina ARM** | A VM é ARM; com emulação, o build seria de 5 a 10 vezes mais lento. Para testar no PC, o build local gera amd64.               |
+| **TURN com 100 portas de retransmissão**         | O padrão (10 mil portas) é lento de mapear no Docker; 100 sobram para o grupo.                                                 |
+| **TURN só em UDP por enquanto**                  | TURN via TLS na 443 (redes muito restritivas) exige outro esquema de certificados; fica no backlog se alguém precisar.         |
+
+### Imprevistos encontrados
+
+- O **Docker Desktop não abria**: um arquivo de socket velho (`docker-secrets-engine\engine.sock`) não podia ser renomeado nem apagado pelo Windows. Solução: renomear a pasta (`docker-secrets-engine.old-20261103`); o Docker criou outra. A pasta antiga pode ser apagada depois de reiniciar o PC.
+- O `ConfigModule` lê o ambiente quando o módulo é importado: o teste do proxy passa a opção direto para o `configureApp`, em vez de mexer no `process.env`.
+- O `npm ci` com filtro de workspace ainda instala pacotes de outros workspaces: a imagem do servidor ficou com 845 MB (ver backlog).
+- O crash nativo raro dos testes no Windows (`0xC0000409`) apareceu de novo, em outro arquivo; rodando de novo, passou (123/123).
+
+### Pendências
+
+- **7b**: criar a VM (Guilherme, com o guia `deploy/README.md`), deixar as imagens públicas no GitHub e subir.
+- **7c**: app desktop apontando para o endereço público; botão de deploy no GitHub Actions; backup diário do banco; o teste real entre dois PCs.
+
+---
+
 ## Decisões já tomadas para fases futuras
 
 - **Fase 7: hospedar o próprio LiveKit numa VM gratuita** (decidido em 28/10/2026), em vez de depender do LiveKit Cloud.
@@ -477,6 +527,7 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 - **Fase 5:** `getDisplayMedia` e limites por navegador; simulcast e adaptive stream; `contentHint` (motion vs detail); taxa de bits vs resolução vs fps; assinatura seletiva de faixas para economizar banda; Fullscreen API.
 - **Fase 6a:** processos do Electron (main, preload, renderer); `contextIsolation`, `sandbox` e a superfície de ataque de um app desktop; IPC e validar quem envia; permissões por origem; empacotamento e instalador (NSIS, asar); assinatura de código e SmartScreen; build no CI em outro sistema operacional.
 - **Fase 6b:** módulos nativos (N-API e ABI estável); threads e como chamar JavaScript de outra thread; COM e APIs assíncronas do Windows; áudio digital (taxa de amostragem, PCM vs float, canais intercalados); fila circular e deriva de relógio; AudioWorklet e a thread de áudio; `MessagePort` e transferência de objetos; como provar algo com um experimento de controle.
+- **Fase 7a:** imagens Docker em várias etapas (_multi-stage_) e por que separar build, migrations e execução; proxy reverso e `X-Forwarded-For` (e por que não confiar nele sem proxy); HTTPS automático (ACME/Let's Encrypt); HSTS e cabeçalhos de segurança; NAT, STUN e TURN; segredos fora do git; registro de imagens e tags imutáveis para voltar uma versão; build nativo vs emulado (QEMU).
 
 ---
 
@@ -493,6 +544,8 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 - Bloquear usuário; status personalizado ("ausente", "não perturbe").
 - Notificações (navegador/desktop) para DMs e menções.
 - Investigar o crash nativo raro dos testes no Windows (ver Fase 2).
+- Imagem do servidor menor (hoje 845 MB): instalar só as dependências do servidor (o `npm ci` com workspace leva pacotes de outros).
+- TURN via TLS na porta 443, para redes que bloqueiam UDP e portas incomuns (Wi-Fi de empresa e faculdade).
 - **Refinamento de qualidade no fim do projeto** (pedido do Guilherme): ajustar voz (codec, supressão de ruído, ganho) e compartilhamento de tela (resolução, fps, taxa de bits por qualidade, codec como VP9/AV1), medindo com uso real. O que já sabemos do teste da Fase 5:
   - **Tela**:
     - Compartilhar a tela inteira com o próprio app visível gera o "espelho infinito", o pior caso para o codificador. No uso real, compartilhar a janela do jogo ou outro monitor.
