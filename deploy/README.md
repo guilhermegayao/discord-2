@@ -61,7 +61,7 @@ docker compose ps        # migrate: exited (0); os outros: running/healthy
 docker compose logs caddy | grep -i certificate   # certificados emitidos
 ```
 
-As imagens vêm do GitHub Container Registry (`ghcr.io/guilhermegayao/discord-2-*`), publicadas pelo CI a cada push na `main`. Elas precisam estar **públicas**: em _GitHub → seu perfil → Packages → (cada imagem) → Package settings → Change visibility → Public_.
+As imagens vêm do GitHub Container Registry (`ghcr.io/guilhermegayao/discord-2-*`), publicadas pelo CI a cada push na `main`. Como o repositório é público, elas já nascem públicas: a VM baixa sem login.
 
 ## 5. Atualizar
 
@@ -76,5 +76,5 @@ Para voltar a uma versão anterior, coloque `IMAGE_TAG=sha-abc1234` no `deploy/.
 
 - **O site não abre**: confira as portas nos **dois** lugares do passo 2 e se o DuckDNS aponta para o IP certo (`nslookup SEU-NOME.duckdns.org`).
 - **Entra na voz, mas ninguém se ouve**: as portas de mídia (7881/tcp, 7882/udp) estão fechadas em algum dos dois lugares.
-- **`docker compose pull` pede login**: as imagens ainda estão privadas (passo 4).
+- **`docker compose pull` pede login**: alguma imagem ficou privada. Em _GitHub → seu perfil → Packages → (a imagem) → Package settings → Change visibility_, deixe como _Public_.
 - **A Oracle pode recolher VMs gratuitas muito ociosas** (uso baixo de CPU, rede e memória por 7 dias). Se acontecer, os dados do volume se perdem: mantenha um backup do banco (Fase 7c).
