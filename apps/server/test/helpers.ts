@@ -9,9 +9,10 @@ import { PrismaService } from '../src/prisma/prisma.service.js';
 
 export async function createTestApp(
   customize: (builder: TestingModuleBuilder) => TestingModuleBuilder = (b) => b,
+  options: Parameters<typeof configureApp>[1] = {},
 ): Promise<INestApplication> {
   const moduleRef = await customize(Test.createTestingModule({ imports: [AppModule] })).compile();
-  const app = configureApp(moduleRef.createNestApplication());
+  const app = configureApp(moduleRef.createNestApplication(), options);
   await app.init();
   return app;
 }

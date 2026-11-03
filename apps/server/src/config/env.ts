@@ -13,6 +13,12 @@ const envSchema = z.object({
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
   /** true em produção (HTTPS). Em dev, http://localhost não aceita cookie Secure em todos os navegadores. */
   COOKIE_SECURE: z.stringbool().default(false),
+  /**
+   * true atrás de um proxy reverso (Caddy em produção): o IP do cliente vem
+   * do X-Forwarded-For. Sem isso, todo mundo teria o IP do proxy e dividiria
+   * o mesmo rate limit de login/cadastro.
+   */
+  TRUST_PROXY: z.stringbool().default(false),
 
   // --- Tempo real ---
   /** Quanto tempo esperar sem nenhuma aba conectada antes de marcar offline (evita "piscar" no F5). */
