@@ -1,0 +1,14 @@
+# O contexto do build é o monorepo inteiro; só o código-fonte entra.
+**/node_modules
+**/dist
+**/build
+**/release
+**/coverage
+**/*.tsbuildinfo
+.git
+.github
+.env
+.env.*
+!.env.example
+deploy/.env
+apps/desktop

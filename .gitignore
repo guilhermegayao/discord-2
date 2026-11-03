@@ -27,3 +27,6 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Backups do banco na VM (deploy/backups)
+deploy/backups/

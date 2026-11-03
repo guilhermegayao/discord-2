@@ -1,0 +1,115 @@
+# Produção: tudo numa VM só (Fase 7). Rode dentro desta pasta:
+#   docker compose pull && docker compose up -d
+# As variáveis vêm de deploy/.env (crie com ./setup-env.sh; nunca vai para o git).
+name: discord-2
+
+x-images:
+  server: &server-image ${IMAGE_PREFIX:-ghcr.io/guilhermegayao/discord-2}-server:${IMAGE_TAG:-latest}
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-discord2}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+      POSTGRES_DB: ${POSTGRES_DB:-discord2}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # Sem porta publicada: o banco só é acessível pela rede interna do compose.
+
+  # Aplica as migrations e sai; o servidor só sobe depois que ele termina bem.
+  migrate:
+    image: ${IMAGE_PREFIX:-ghcr.io/guilhermegayao/discord-2}-migrate:${IMAGE_TAG:-latest}
+    restart: 'no'
+    environment:
+      DATABASE_URL: &database-url postgresql://${POSTGRES_USER:-discord2}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-discord2}?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  server:
+    image: *server-image
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      SERVER_PORT: 3100
+      DATABASE_URL: *database-url
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?defina JWT_ACCESS_SECRET no .env}
+      COOKIE_SECURE: 'true'
+      # Atrás do Caddy: o IP real vem do X-Forwarded-For (rate limit por pessoa).
+      TRUST_PROXY: 'true'
+      LIVEKIT_URL: wss://livekit.${APP_DOMAIN:?defina APP_DOMAIN no .env}
+      # Dentro da rede do compose o servidor fala direto com o LiveKit.
+      LIVEKIT_API_URL: http://livekit:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-discord2}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?defina LIVEKIT_API_SECRET no .env}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  livekit:
+    image: livekit/livekit-server:v1.13.10
+    restart: unless-stopped
+    environment:
+      LIVEKIT_CONFIG: |
+        port: 7880
+        rtc:
+          # Mídia: uma porta UDP (multiplexada) e TCP como reserva para redes
+          # que bloqueiam UDP.
+          udp_port: 7882
+          tcp_port: 7881
+          # Na VM: descobre o IP público sozinho (a Oracle faz NAT 1:1).
+          use_external_ip: ${LIVEKIT_USE_EXTERNAL_IP:-true}
+          node_ip: ${LIVEKIT_NODE_IP:-}
+        # TURN embutido: ajuda quem está atrás de NAT difícil (4G, alguns roteadores).
+        turn:
+          enabled: true
+          domain: livekit.${APP_DOMAIN}
+          udp_port: 3478
+          # Portas que o TURN usa para retransmitir a mídia. O padrão é uma faixa
+          # de 10 mil (lenta de mapear no Docker); 100 sobram para um grupo pequeno.
+          relay_range_start: 30000
+          relay_range_end: 30099
+        keys:
+          ${LIVEKIT_API_KEY:-discord2}: ${LIVEKIT_API_SECRET}
+        webhook:
+          api_key: ${LIVEKIT_API_KEY:-discord2}
+          urls:
+            - http://server:3100/api/livekit/webhook
+        logging:
+          level: info
+    ports:
+      - '7881:7881/tcp'
+      - '7882:7882/udp'
+      - '3478:3478/udp'
+      - '30000-30099:30000-30099/udp'
+
+  # Site + proxy reverso com HTTPS automático (Let's Encrypt).
+  caddy:
+    image: ${IMAGE_PREFIX:-ghcr.io/guilhermegayao/discord-2}-web:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - server
+      - livekit
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:
