@@ -20,7 +20,7 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 | 5    | Compartilhamento de tela no navegador (getDisplayMedia)                   | ✅ Concluída                      |
 | 6a   | App desktop Electron: seletor próprio de tela/janela, instalador `.exe`   | ✅ Concluída                      |
 | 6b   | Áudio do sistema no app sem eco (módulo nativo do Windows)                | ✅ Concluída (falta teste manual) |
-| 7    | Deploy gratuito: VM da Oracle com Caddy, Postgres e LiveKit próprio       | 🔄 Em andamento (7a pronta)       |
+| 7    | Deploy: VPS em São Paulo com Caddy, Postgres e LiveKit próprio            | 🔄 Em andamento (7a e 7b prontas) |
 | 8    | Mobile com Expo (incluindo tela no iOS via ReplayKit/Broadcast Extension) | —                                 |
 
 ---
@@ -454,9 +454,11 @@ Prioridade: PC (web + desktop) primeiro, mobile depois. Custo: o mínimo possív
 
 ---
 
-## Fase 7 — Deploy gratuito 🔄 (7a: 03/11/2026)
+## Fase 7 — Deploy 🔄 (7a: 03/11/2026 · 7b: 19/11/2026)
 
-Plano aprovado: **7a** preparar o projeto para produção · **7b** criar a VM da Oracle (São Paulo) e subir · **7c** app desktop apontando para o endereço público, deploy pelo GitHub, backup e o teste real entre dois PCs. Endereço: subdomínio gratuito do **DuckDNS**.
+Plano aprovado: **7a** preparar o projeto para produção · **7b** criar o servidor e subir · **7c** app desktop apontando para o endereço público, deploy pelo GitHub, backup e o teste real entre dois PCs. Endereço: subdomínio gratuito do **DuckDNS**.
+
+**No ar em https://discord2-gui.duckdns.org** (19/11/2026).
 
 ### 7a — O que foi feito
 
@@ -497,20 +499,46 @@ Plano aprovado: **7a** preparar o projeto para produção · **7b** criar a VM d
 - O `npm ci` com filtro de workspace ainda instala pacotes de outros workspaces: a imagem do servidor ficou com 845 MB (ver backlog).
 - O crash nativo raro dos testes no Windows (`0xC0000409`) apareceu de novo, em outro arquivo; rodando de novo, passou (123/123).
 
+### 7b — O que foi feito
+
+- **Servidor**: a conta gratuita da Oracle não saiu (o cadastro de conta pessoal travou). Em vez dela: **VPS da KingHost em São Paulo**, x86, 2 vCPU, 4 GB, 70 GB, transferência ilimitada (R$ 53,90 no 1º mês, depois R$ 79,90/mês; contratada pelo Guilherme).
+  - Configurada pelo painel com **Ubuntu 24.04 + Docker** e acesso por **chave SSH** gerada no PC (`~/.ssh/discord2-vps`; a parte privada nunca saiu de lá).
+- **Segurança**:
+  - SSH só por chave: o login por senha foi desligado, e um teste confirmou que a senha é recusada;
+  - firewall (`ufw`) só com as portas do projeto;
+  - o Postgres não é acessível de fora (testado).
+- **Rede testada do PC até a VPS**: TCP 80/7881 e um eco **UDP** em 7882, 3478 e 30050 (sem firewall do provedor no caminho).
+- **DuckDNS**: `discord2-gui.duckdns.org` e `livekit.discord2-gui.duckdns.org` apontando para a VPS.
+- **No ar**: o Caddy obteve os certificados do Let's Encrypt; o site, as rotas do React, `/api/health` (banco no ar), HTTP→HTTPS, LiveKit e Socket.IO respondem pelo endereço público.
+- **CI**: as imagens passaram a ser publicadas para **amd64**, o processador da VPS.
+- `deploy/README.md` reescrito com os passos reais, servindo para qualquer VPS x86.
+
+### Decisões tomadas (7b)
+
+| Decisão                                            | Motivo                                                                                                                                                                                            |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **VPS paga em São Paulo** em vez de nuvem gratuita | A Oracle não deixou criar a conta. As outras gratuitas têm banda de saída mínima (Google, 1 GB/mês) ou só créditos temporários (AWS, Azure). Servidor no Brasil = voz com uns 10–40 ms de atraso. |
+| **Chave SSH no lugar de senha**                    | Servidor com login por senha recebe tentativas de invasão o dia todo; a chave não pode ser adivinhada.                                                                                            |
+| **`importFileExtension = "js"` no Prisma**         | O Prisma deduzia a extensão pelo tsconfig, que ainda não existe na etapa do Docker em que ele gera o cliente (ver imprevistos).                                                                   |
+
+### Imprevistos (7b)
+
+- **O servidor reiniciava em loop na VPS** (`ERR_MODULE_NOT_FOUND .../internal/class.ts`):
+  - O cliente do Prisma gerado **dentro do Docker** importava arquivos `.ts`. O teste local da 7a não pegou porque o `COPY` levava o cliente **já gerado no PC**, que estava certo.
+  - Correção: extensão fixa no schema, e o cliente gerado saiu do contexto do Docker (`.dockerignore`), para o build local ficar idêntico ao do CI.
+  - Para subir na hora, a imagem corrigida foi construída na própria VPS, que também é x86.
+- O DuckDNS pede **reCAPTCHA** a cada login: o Guilherme resolveu e o resto foi automatizado.
+- O Docker Desktop do PC estava fechado; a VPS serviu de máquina de build.
+
 ### Pendências
 
-- **7b**: criar a VM (Guilherme, com o guia `deploy/README.md`), deixar as imagens públicas no GitHub e subir.
-- **7c**: app desktop apontando para o endereço público; botão de deploy no GitHub Actions; backup diário do banco; o teste real entre dois PCs.
+- **7c**: app desktop apontando para o endereço público; botão de deploy no GitHub Actions; backup diário do banco; o teste real entre dois PCs (incluindo pelo 4G, para testar o TURN).
 
 ---
 
 ## Decisões já tomadas para fases futuras
 
-- **Fase 7: hospedar o próprio LiveKit numa VM gratuita** (decidido em 28/10/2026), em vez de depender do LiveKit Cloud.
-  - Motivo: o plano gratuito do LiveKit Cloud tem cerca de 50 GB/mês de banda de saída, e **compartilhar tela consome isso rápido**.
-  - Candidata: camada _Always Free_ da Oracle Cloud (VM ARM, muito tráfego de saída). **Conferir limites e regras na hora**: pede cartão no cadastro, só para verificação.
-  - A VM vai precisar de domínio/subdomínio, HTTPS e o TURN embutido do LiveKit. O servidor Nest e o Postgres podem ficar na mesma VM.
-  - Consequência para a Fase 4: a configuração do LiveKit (`livekit.yaml`, chaves, portas, webhook) é feita para ser levada para a VM, toda via variáveis de ambiente.
+- **Fase 7: hospedar o próprio LiveKit** (decidido em 28/10/2026), em vez de depender do LiveKit Cloud, cuja banda gratuita acaba rápido com transmissão de tela. A ideia inicial era uma VM gratuita da Oracle, que não deu certo; ficou uma VPS em São Paulo (ver Fase 7).
 - **Fase 8: compartilhamento de tela no iPhone** provavelmente exigirá o Apple Developer Program (pago, anual). Confirmar valores e alternativas antes de começar.
 
 ---

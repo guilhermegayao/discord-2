@@ -1,6 +1,8 @@
-# Deploy (Fase 7): uma VM gratuita da Oracle
+# Deploy (Fase 7): uma VPS só
 
-Tudo roda numa VM só, em Docker:
+Produção: **https://discord2-gui.duckdns.org** (VPS KingHost em São Paulo, Ubuntu 24.04, 2 vCPU, 4 GB).
+
+Tudo roda na VPS, em Docker:
 
 | Serviço    | O que faz                                                 | Portas públicas                               |
 | ---------- | --------------------------------------------------------- | --------------------------------------------- |
@@ -10,63 +12,66 @@ Tudo roda numa VM só, em Docker:
 | `postgres` | Banco                                                     | — (só pela rede interna)                      |
 | `livekit`  | Voz e tela (SFU) com TURN embutido                        | 7881/tcp, 7882/udp, 3478/udp, 30000–30099/udp |
 
-Endereços: o site em `https://SEU-NOME.duckdns.org` e o LiveKit em `wss://livekit.SEU-NOME.duckdns.org`.
+Endereços: o site em `https://SEU-NOME.duckdns.org` e o LiveKit em `wss://livekit.SEU-NOME.duckdns.org`. Os passos abaixo servem para qualquer VPS x86 com Ubuntu; entre parênteses, como foi na KingHost.
 
-## 1. Criar a VM (no site da Oracle)
+## 1. Criar a VPS
 
-1. Crie a conta em <https://www.oracle.com/cloud/free/>. **Região: Brazil East (São Paulo)**, que não muda depois. A Oracle pede cartão só para verificar; não ative o plano pago.
-2. _Compute → Instances → Create instance_:
-   - **Image**: Canonical Ubuntu 24.04 (aarch64).
-   - **Shape**: _Ampere_ → `VM.Standard.A1.Flex`, **4 OCPUs e 24 GB** (o máximo gratuito). Se der _Out of host capacity_, tente 2 OCPUs / 12 GB ou outro horário.
-   - **SSH keys**: _Paste public key_ e cole o conteúdo de `~/.ssh/discord2-oracle.pub`, que é a parte pública (a privada nunca sai do seu PC).
-3. Anote o **IP público** da VM.
-
-## 2. Abrir as portas (dois lugares!)
-
-**a) Na Oracle**: _Networking → Virtual cloud networks → (sua VCN) → Security Lists → Default → Add Ingress Rules_, com origem `0.0.0.0/0`:
-
-| Protocolo | Portas      |
-| --------- | ----------- |
-| TCP       | 80, 443     |
-| UDP       | 443         |
-| TCP       | 7881        |
-| UDP       | 7882        |
-| UDP       | 3478        |
-| UDP       | 30000-30099 |
-
-**b) No Ubuntu da VM**: a imagem da Oracle vem com um firewall (iptables) que bloqueia tudo além do SSH. Pela VM (`ssh -i ~/.ssh/discord2-oracle ubuntu@IP`):
+- **Sistema**: Ubuntu 24.04, sem painel (cPanel, Plesk etc.). Na KingHost: _Ubuntu 24.04_ com a tecnologia _Docker_, que já vem instalado.
+- **Acesso**: por **chave SSH**, não por senha. Gere a chave no seu PC e cole só a parte **pública** no painel:
 
 ```bash
-for p in 80 443 7881; do sudo iptables -I INPUT 6 -p tcp --dport $p -j ACCEPT; done
-for p in 443 7882 3478; do sudo iptables -I INPUT 6 -p udp --dport $p -j ACCEPT; done
-sudo iptables -I INPUT 6 -p udp --dport 30000:30099 -j ACCEPT
-sudo netfilter-persistent save
+ssh-keygen -t ed25519 -f ~/.ssh/discord2-vps -C discord2-vps
 ```
+
+- Anote o **IP público**. Entrar: `ssh -i ~/.ssh/discord2-vps root@IP`.
+
+## 2. Segurança básica (na VPS)
+
+Só login por chave (o arquivo `00-` vem antes do `50-cloud-init.conf`, e no `sshd` vale o primeiro valor):
+
+```bash
+cat > /etc/ssh/sshd_config.d/00-discord2.conf <<'EOF'
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin prohibit-password
+EOF
+sshd -t && systemctl reload ssh
+```
+
+Firewall com só as portas do projeto (o SSH primeiro, para não se trancar fora):
+
+```bash
+ufw allow 22/tcp
+ufw allow 80/tcp; ufw allow 443/tcp; ufw allow 443/udp
+ufw allow 7881/tcp; ufw allow 7882/udp; ufw allow 3478/udp; ufw allow 30000:30099/udp
+ufw --force enable
+```
+
+Se o provedor tiver um firewall próprio no painel, libere as mesmas portas lá (na KingHost não foi preciso).
 
 ## 3. Endereço (DuckDNS)
 
-Em <https://www.duckdns.org> (login com o GitHub), crie o subdomínio e coloque o IP público da VM. O DuckDNS já responde também `livekit.SEU-NOME.duckdns.org` com o mesmo IP.
+Em <https://www.duckdns.org> (login com o GitHub; ele pede reCAPTCHA), crie o subdomínio e coloque o IP da VPS. O DuckDNS já responde também `livekit.SEU-NOME.duckdns.org` com o mesmo IP. O **token** que aparece na página é segredo: não compartilhe.
 
-## 4. Docker e primeira subida (na VM)
+## 4. Primeira subida (na VPS)
 
 ```bash
-curl -fsSL https://get.docker.com | sudo sh
-sudo usermod -aG docker ubuntu   # depois saia e entre de novo no SSH
-git clone --depth 1 https://github.com/guilhermegayao/discord-2.git
+curl -fsSL https://get.docker.com | sh   # só se o Docker não veio instalado
+cd /opt && git clone --depth 1 https://github.com/guilhermegayao/discord-2.git
 cd discord-2/deploy
 ./setup-env.sh SEU-NOME.duckdns.org   # gera o .env com segredos aleatórios
 docker compose pull
 docker compose up -d
 docker compose ps        # migrate: exited (0); os outros: running/healthy
-docker compose logs caddy | grep -i certificate   # certificados emitidos
+docker compose logs caddy | grep -i "certificate obtained"
 ```
 
-As imagens vêm do GitHub Container Registry (`ghcr.io/guilhermegayao/discord-2-*`), publicadas pelo CI a cada push na `main`. Como o repositório é público, elas já nascem públicas: a VM baixa sem login.
+As imagens vêm do GitHub Container Registry (`ghcr.io/guilhermegayao/discord-2-*`, x86), publicadas pelo CI a cada push na `main`. Como o repositório é público, elas já nascem públicas: a VPS baixa sem login.
 
 ## 5. Atualizar
 
 ```bash
-cd ~/discord-2 && git pull && cd deploy
+cd /opt/discord-2 && git pull && cd deploy
 docker compose pull && docker compose up -d
 ```
 
@@ -74,7 +79,7 @@ Para voltar a uma versão anterior, coloque `IMAGE_TAG=sha-abc1234` no `deploy/.
 
 ## Problemas comuns
 
-- **O site não abre**: confira as portas nos **dois** lugares do passo 2 e se o DuckDNS aponta para o IP certo (`nslookup SEU-NOME.duckdns.org`).
-- **Entra na voz, mas ninguém se ouve**: as portas de mídia (7881/tcp, 7882/udp) estão fechadas em algum dos dois lugares.
+- **O site não abre**: confira o firewall (`ufw status`) e o do painel do provedor, e se o DuckDNS aponta para o IP certo (`nslookup SEU-NOME.duckdns.org`).
+- **Entra na voz, mas ninguém se ouve**: as portas de mídia (7881/tcp, 7882/udp) estão fechadas em algum firewall.
+- **O servidor reinicia em loop**: veja o motivo com `docker compose logs server --tail 30`.
 - **`docker compose pull` pede login**: alguma imagem ficou privada. Em _GitHub → seu perfil → Packages → (a imagem) → Package settings → Change visibility_, deixe como _Public_.
-- **A Oracle pode recolher VMs gratuitas muito ociosas** (uso baixo de CPU, rede e memória por 7 dias). Se acontecer, os dados do volume se perdem: mantenha um backup do banco (Fase 7c).
