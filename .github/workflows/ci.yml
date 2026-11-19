@@ -103,12 +103,13 @@ jobs:
           retention-days: 14
 
   # Publica as imagens de produção (Fase 7) no GitHub Container Registry.
-  # Só na main e só depois dos testes. Build nativo em ARM: a VM da Oracle é ARM.
+  # Só na main e só depois dos testes. A VPS (KingHost) é x86: build nativo
+  # em amd64, sem emulação.
   images:
-    name: Imagem ${{ matrix.image }} (arm64)
+    name: Imagem ${{ matrix.image }} (amd64)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: check
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
@@ -151,7 +152,7 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           target: ${{ matrix.target }}
-          platforms: linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
