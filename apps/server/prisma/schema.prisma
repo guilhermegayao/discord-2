@@ -4,6 +4,9 @@ generator client {
   provider     = "prisma-client"
   output       = "../src/generated/prisma"
   moduleFormat = "esm"
+  // Explícito: sem isso o Prisma deduz pelo tsconfig, e no build do Docker
+  // (onde o tsconfig ainda não está) gerava imports .ts, que o Node não roda.
+  importFileExtension = "js"
 }
 
 datasource db {

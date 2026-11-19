@@ -5,6 +5,8 @@
 **/release
 **/coverage
 **/*.tsbuildinfo
+# Gerado dentro da imagem (prisma generate); a cópia local mascarava erros do CI
+apps/server/src/generated
 .git
 .github
 .env
