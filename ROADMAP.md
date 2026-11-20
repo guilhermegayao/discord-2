@@ -561,6 +561,16 @@ Plano aprovado: **7a** preparar o projeto para produção · **7b** criar o serv
 
 ## Backlog (ideias para depois)
 
+**Pedidos do Guilherme após o primeiro uso em produção (19/11/2026)**, a priorizar depois da 7c:
+
+- **Transmissão de tela fluida**: ainda trava e não é fluida (ver "Refinamento de qualidade" abaixo).
+- **Som da transmissão de tela abafado**: revisar taxa de bits, canais e processamento do áudio do PC (o _preset_ de música e o caminho nativo → AudioWorklet).
+- **Autenticação forte**: verificação em duas etapas (TOTP, app autenticador), confirmação de e-mail, recuperação de senha, tela de sessões ativas, alerta de login novo; avaliar _passkeys_.
+- **Identidade visual própria**: paleta **vermelho e preto**, bem diferente do Discord.
+- **Novo nome e nova logo** (site, app desktop, instalador e futuramente o app de celular).
+- **Layout para celular**: a gaveta de canais (☰) foi o primeiro passo; falta revisar o resto da tela pequena.
+- **Publicar o app de celular** (Fase 8): conta Apple Developer (US$ 99/ano) para TestFlight/App Store; Google Play (US$ 25, uma vez).
+
 - Teste **E2E com Playwright** (cadastro e login num navegador de verdade, rodando no CI).
 - Indicador de mensagens não lidas e menções.
 - Markdown e links clicáveis nas mensagens.
