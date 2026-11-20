@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Navigate, NavLink, Outlet, useNavigate, useParams } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
+import { ChannelDrawer } from './ChannelDrawer';
 import { CreateChannelModal } from './CreateChannelModal';
 import { type GuildContext, useGuildContext } from './guildContext';
 import { useDeleteGuild, useGuild } from './hooks';
@@ -44,7 +45,7 @@ export function GuildLayout() {
 
   return (
     <>
-      <aside className="channel-bar">
+      <ChannelDrawer>
         <header className="channel-bar__header">
           <h2 title={data.name}>{data.name}</h2>
           <span className="channel-bar__actions">
@@ -119,7 +120,7 @@ export function GuildLayout() {
         </div>
 
         <VoicePanel />
-      </aside>
+      </ChannelDrawer>
 
       <Outlet context={{ guild: data, isOwner } satisfies GuildContext} />
 

@@ -1,4 +1,5 @@
 import { Navigate, NavLink, Outlet, useParams } from 'react-router';
+import { ChannelDrawer } from './ChannelDrawer';
 import { initials } from './format';
 import { Composer } from './Composer';
 import { MessageList } from './MessageList';
@@ -12,7 +13,7 @@ export function DmLayout() {
 
   return (
     <>
-      <aside className="channel-bar">
+      <ChannelDrawer>
         <header className="channel-bar__header">
           <h2>Mensagens diretas</h2>
         </header>
@@ -45,7 +46,7 @@ export function DmLayout() {
         </nav>
         {/* A voz continua conectada lendo DMs; o painel fica no mesmo lugar. */}
         <VoicePanel />
-      </aside>
+      </ChannelDrawer>
       <Outlet />
     </>
   );

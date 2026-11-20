@@ -1088,15 +1088,64 @@ textarea:focus-visible {
   font: inherit;
 }
 
-/* Telas estreitas: some a coluna de canais e a de membros (navegação mobile entra na Fase 8). */
+/* Botão ☰ e fundo escuro da gaveta de canais: só existem em tela estreita. */
+.drawer-toggle,
+.drawer-backdrop {
+  display: none;
+}
+
+/* Telas estreitas: some a coluna de membros. */
 @media (width < 900px) {
   .member-bar {
     display: none;
   }
 }
 
+/* Celular: a coluna de canais vira uma gaveta por cima do chat, aberta pelo ☰. */
 @media (width < 700px) {
   .channel-bar {
     display: none;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 72px;
+    z-index: 20;
+    width: min(280px, calc(100vw - 72px));
+    box-shadow: 4px 0 16px rgb(0 0 0 / 40%);
+  }
+
+  .channel-bar--open {
+    display: flex;
+  }
+
+  .drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 19;
+    background: rgb(0 0 0 / 50%);
+  }
+
+  .drawer-toggle {
+    display: grid;
+    place-items: center;
+    position: fixed;
+    top: 6px;
+    left: 78px;
+    z-index: 10;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text);
+    font-size: 1.3rem;
+    cursor: pointer;
+  }
+
+  /* Abre espaço no topo do chat para o ☰ não cobrir o nome do canal. */
+  .chat__header {
+    padding-left: 52px;
   }
 }

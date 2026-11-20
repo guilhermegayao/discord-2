@@ -93,6 +93,39 @@ describe('navegação', () => {
     // /channels redireciona para o servidor que o usuário tem
     expect(await screen.findByRole('heading', { name: 'geral' })).toBeInTheDocument();
   });
+
+  it('no celular, o ☰ abre a lista de canais e escolher um canal a fecha', async () => {
+    const user = userEvent.setup();
+    withGuild();
+    server.use(
+      http.get('/api/guilds/g-1', () =>
+        HttpResponse.json(
+          guild({ channels: [channel(), channel({ id: 'c-memes', name: 'memes' })] }),
+        ),
+      ),
+      http.get('/api/channels/c-memes/messages', () =>
+        HttpResponse.json({ messages: [], hasMore: false }),
+      ),
+    );
+
+    renderApp(CHANNEL_URL);
+    await user.click(await screen.findByRole('button', { name: 'Abrir canais' }));
+
+    expect(screen.getByRole('button', { name: 'Fechar canais' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(document.querySelector('.channel-bar--open')).not.toBeNull();
+
+    await user.click(screen.getByRole('link', { name: 'memes' }));
+
+    expect(await screen.findByRole('heading', { name: 'memes' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abrir canais' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(document.querySelector('.channel-bar--open')).toBeNull();
+  });
 });
 
 describe('histórico', () => {
